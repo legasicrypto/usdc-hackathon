@@ -1,7 +1,7 @@
 [package]
 name = "legasi-credit"
 version = "0.1.0"
-description = "Legasi Credit Protocol"
+description = "Legasi Credit Protocol with Gradual Auto-Deleveraging"
 edition = "2021"
 
 [lib]
