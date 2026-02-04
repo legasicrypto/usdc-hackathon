@@ -1,11 +1,48 @@
 'use client';
 
+import { useState } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 export default function Home() {
   const { connected } = useWallet();
+  const router = useRouter();
+  const [email, setEmail] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleWaitlistSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email) return;
+    
+    setLoading(true);
+    setError('');
+
+    try {
+      const res = await fetch('/api/waitlist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok && res.status !== 200) {
+        setError(data.error || 'Something went wrong');
+        return;
+      }
+
+      // Redirect to waitlist page with their code
+      router.push(`/waitlist?ref=${data.entry.code}`);
+    } catch (err) {
+      console.error('Waitlist error:', err);
+      setError('Network error. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <main className="flex flex-col min-h-screen">
@@ -130,16 +167,32 @@ export default function Home() {
           <p className="text-xl text-white/70">
             Join the waitlist for early access and exclusive benefits.
           </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+          <form onSubmit={handleWaitlistSubmit} className="flex flex-col sm:flex-row gap-4 justify-center">
             <input
               type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               placeholder="Enter your email"
+              required
               className="px-6 py-4 bg-white/10 rounded-xl border border-white/20 focus:border-blue-400 focus:outline-none w-full sm:w-80"
             />
-            <button className="px-8 py-4 bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl font-semibold hover:opacity-90 transition">
-              Join Waitlist
+            <button
+              type="submit"
+              disabled={loading}
+              className="px-8 py-4 bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl font-semibold hover:opacity-90 transition disabled:opacity-50"
+            >
+              {loading ? 'Joining...' : 'Join Waitlist'}
             </button>
-          </div>
+          </form>
+          {error && (
+            <p className="text-red-400 text-sm">{error}</p>
+          )}
+          <p className="text-white/50 text-sm">
+            Already signed up?{' '}
+            <Link href="/waitlist" className="text-blue-400 hover:underline">
+              Check your status
+            </Link>
+          </p>
         </div>
       </section>
 

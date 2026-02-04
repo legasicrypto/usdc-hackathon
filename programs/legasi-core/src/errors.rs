@@ -68,45 +68,9 @@ pub enum LegasiError {
     #[msg("Slippage exceeded")]
     SlippageExceeded,
 
-    #[msg("Position already exists")]
-    PositionAlreadyExists,
-
-    #[msg("Collateral type already deposited")]
-    CollateralAlreadyDeposited,
-
-    #[msg("Borrow type already exists")]
-    BorrowAlreadyExists,
-
     #[msg("Max collateral types reached")]
     MaxCollateralTypesReached,
 
     #[msg("Max borrow types reached")]
     MaxBorrowTypesReached,
-
-    #[msg("Market not found")]
-    MarketNotFound,
-
-    #[msg("Market not active")]
-    MarketNotActive,
-
-    #[msg("Borrow not enabled for this market")]
-    BorrowNotEnabled,
-
-    #[msg("Collateral not enabled for this market")]
-    CollateralNotEnabled,
-
-    #[msg("Supply cap exceeded")]
-    SupplyCapExceeded,
-
-    #[msg("Borrow cap exceeded")]
-    BorrowCapExceeded,
-
-    #[msg("Below minimum borrow amount")]
-    BelowMinBorrow,
-
-    #[msg("eMode category mismatch - cannot use eMode with these assets")]
-    EModeCategoryMismatch,
-
-    #[msg("Cannot change eMode while having active positions")]
-    CannotChangeEModeWithActivePositions,
 }

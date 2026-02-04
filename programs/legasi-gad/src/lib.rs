@@ -7,7 +7,7 @@ use legasi_core::{
     state::*, errors::LegasiError, constants::*, events::*,
 };
 
-declare_id!("72p3DSpc1KBioqrx9F3Eu1RtGbzdgCFZZWjn6Bg67C96");
+declare_id!("Ed7pfvjR1mRWmzHP3r1NvukESGr38xZKwpoQ5jGSAVad");
 
 /// GAD rate curve - continuous quadratic with capped max
 fn get_gad_rate_bps(current_ltv_bps: u64, max_ltv_bps: u64) -> u64 {

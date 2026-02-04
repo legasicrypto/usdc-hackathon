@@ -6,12 +6,12 @@ resolution = true
 skip-lint = false
 
 [programs.devnet]
-legasi_core = "MwmRkwGKwMPe9Z1hcPT3PEjGMyCpJW97BmgYJdKdNMj"
-legasi_lending = "3J91it4U5efZ65m2bfczZzkhFJzkzSPwMmZN9d6NiRWw"
-legasi_gad = "72p3DSpc1KBioqrx9F3Eu1RtGbzdgCFZZWjn6Bg67C96"
-legasi_lp = "HZm3U2tJTJpND94o1tNHV1mrG6wF17i4xYeCp6BNJz5z"
-legasi_flash = "GSwwfoVu45LQ8AFZCMyX7Yd1bppLDsXGnt9NKEUiPALW"
-legasi_leverage = "5hqw7X7Y7ofJrxn53U3YVN6WJ6xeYekfyXU6HumjiQPq"
+legasi_core = "5Mru5amfomEPqNiEULRuHpgAZyyENqyCeNnkSoh7QjLy"
+legasi_flash = "24zjRceYHjkyP8Nr4bc4q9T7TBbkf292gFocGp6SM5Fz"
+legasi_gad = "Ed7pfvjR1mRWmzHP3r1NvukESGr38xZKwpoQ5jGSAVad"
+legasi_lending = "DGRYqD9Hg9v27Fa9kLUUf3KY9hoprjBQp7y88qG9q88u"
+legasi_leverage = "G9iVPMnf4kiRKr59tn1t7m5W4WK2KveFLzANX4bbHtjA"
+legasi_lp = "4g7FgDLuxXJ7fRa57m8SV3gjznMZ9KUjcdJfg1b6BfPF"
 
 [registry]
 url = "https://api.apr.dev"

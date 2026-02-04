@@ -5,7 +5,7 @@ use legasi_core::{
     state::*, errors::LegasiError, constants::*, events::*,
 };
 
-declare_id!("HZm3U2tJTJpND94o1tNHV1mrG6wF17i4xYeCp6BNJz5z");
+declare_id!("4g7FgDLuxXJ7fRa57m8SV3gjznMZ9KUjcdJfg1b6BfPF");
 
 #[program]
 pub mod legasi_lp {

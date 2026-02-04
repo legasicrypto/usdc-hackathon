@@ -7,7 +7,7 @@ use legasi_core::{
     state::*, errors::LegasiError, constants::*, events::*,
 };
 
-declare_id!("5hqw7X7Y7ofJrxn53U3YVN6WJ6xeYekfyXU6HumjiQPq");
+declare_id!("G9iVPMnf4kiRKr59tn1t7m5W4WK2KveFLzANX4bbHtjA");
 
 /// Leverage position tracking
 #[account]

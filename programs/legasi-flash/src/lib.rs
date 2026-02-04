@@ -5,7 +5,7 @@ use legasi_core::{
     state::*, errors::LegasiError, constants::*, events::*,
 };
 
-declare_id!("GSwwfoVu45LQ8AFZCMyX7Yd1bppLDsXGnt9NKEUiPALW");
+declare_id!("24zjRceYHjkyP8Nr4bc4q9T7TBbkf292gFocGp6SM5Fz");
 
 /// Flash loan state (tracks outstanding loans in a transaction)
 #[account]
