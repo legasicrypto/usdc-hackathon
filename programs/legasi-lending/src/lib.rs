@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 use anchor_lang::solana_program::program::invoke;
 use anchor_lang::solana_program::program::invoke_signed;
 use anchor_lang::solana_program::system_instruction;
-use anchor_spl::token::{self, Token, TokenAccount, Transfer};
+use anchor_spl::token::{self, Token, TokenAccount, Transfer, Mint};
 
 use legasi_core::{state::*, errors::LegasiError, constants::*};
 
@@ -71,7 +71,7 @@ pub mod legasi_lending {
         Ok(())
     }
 
-    /// Deposit SPL token as collateral (cbBTC, JitoSOL, mSOL)
+    /// Deposit SPL token as collateral (cbBTC)
     pub fn deposit_token(ctx: Context<DepositToken>, amount: u64) -> Result<()> {
         require!(amount > 0, LegasiError::InvalidAmount);
         require!(ctx.accounts.collateral_config.is_active, LegasiError::AssetNotActive);
@@ -120,7 +120,7 @@ pub mod legasi_lending {
         Ok(())
     }
 
-    /// Borrow stablecoins (USDC, USDT, EURC)
+    /// Borrow stablecoins (USDC, EURC)
     pub fn borrow(ctx: Context<Borrow>, amount: u64) -> Result<()> {
         require!(amount > 0, LegasiError::InvalidAmount);
         require!(ctx.accounts.borrowable_config.is_active, LegasiError::AssetNotActive);
@@ -132,7 +132,7 @@ pub mod legasi_lending {
         // Calculate collateral value
         let mut total_collateral_usd: u64 = 0;
         for deposit in &ctx.accounts.position.collaterals {
-            if deposit.asset_type == AssetType::SOL || deposit.asset_type == AssetType::JitoSOL || deposit.asset_type == AssetType::MSOL {
+            if deposit.asset_type == AssetType::SOL || deposit.asset_type == AssetType::CbBTC {
                 let value = (deposit.amount as u128)
                     .checked_mul(sol_price as u128)
                     .ok_or(LegasiError::MathOverflow)?
@@ -334,6 +334,94 @@ pub mod legasi_lending {
         msg!("Withdrew {} lamports", amount);
         Ok(())
     }
+
+    /// Off-ramp borrowed stablecoins via Bridge.xyz
+    /// Burns the borrowed tokens and initiates fiat transfer
+    pub fn offramp_via_bridge(
+        ctx: Context<OfframpViaBridge>,
+        amount: u64,
+        destination_iban: String,     // Bank account IBAN
+        destination_name: String,      // Recipient name
+    ) -> Result<()> {
+        require!(amount > 0, LegasiError::InvalidAmount);
+        require!(destination_iban.len() > 10, LegasiError::InvalidAmount); // Basic IBAN validation
+        
+        // Check user has borrowed this amount
+        let position = &ctx.accounts.position;
+        let mut borrowed_amount: u64 = 0;
+        for borrow in &position.borrows {
+            if borrow.asset_type == AssetType::USDC || borrow.asset_type == AssetType::EURC {
+                borrowed_amount = borrowed_amount.saturating_add(borrow.amount);
+            }
+        }
+        require!(borrowed_amount >= amount, LegasiError::InsufficientLiquidity);
+        
+        // Burn tokens from user's account
+        token::burn(
+            CpiContext::new(
+                ctx.accounts.token_program.to_account_info(),
+                token::Burn {
+                    mint: ctx.accounts.stablecoin_mint.to_account_info(),
+                    from: ctx.accounts.user_token_account.to_account_info(),
+                    authority: ctx.accounts.owner.to_account_info(),
+                },
+            ),
+            amount,
+        )?;
+        
+        // Create off-ramp request record
+        let offramp = &mut ctx.accounts.offramp_request;
+        offramp.owner = ctx.accounts.owner.key();
+        offramp.amount = amount;
+        offramp.destination_iban = destination_iban.clone();
+        offramp.destination_name = destination_name.clone();
+        offramp.status = OfframpStatus::Pending;
+        offramp.created_at = Clock::get()?.unix_timestamp;
+        offramp.bump = ctx.bumps.offramp_request;
+        
+        emit!(OfframpRequested {
+            owner: ctx.accounts.owner.key(),
+            amount,
+            destination_iban,
+            asset_type: AssetType::USDC, // TODO: detect from mint
+        });
+        
+        msg!("Off-ramp requested: {} USDC to {}", amount, destination_name);
+        Ok(())
+    }
+}
+
+/// Off-ramp request status
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq, Debug, InitSpace)]
+pub enum OfframpStatus {
+    Pending,
+    Processing,
+    Completed,
+    Failed,
+}
+
+/// Off-ramp request account
+#[account]
+#[derive(InitSpace)]
+pub struct OfframpRequest {
+    pub owner: Pubkey,
+    pub amount: u64,
+    #[max_len(34)]
+    pub destination_iban: String,
+    #[max_len(100)]
+    pub destination_name: String,
+    pub status: OfframpStatus,
+    pub created_at: i64,
+    pub completed_at: i64,
+    pub bump: u8,
+}
+
+#[event]
+pub struct OfframpRequested {
+    pub owner: Pubkey,
+    pub amount: u64,
+    pub destination_iban: String,
+    pub asset_type: AssetType,
 }
 
 // ========== ACCOUNTS ==========
@@ -428,5 +516,27 @@ pub struct WithdrawSol<'info> {
     pub sol_mint: UncheckedAccount<'info>,
     #[account(mut)]
     pub owner: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct OfframpViaBridge<'info> {
+    #[account(mut, seeds = [b"position", owner.key().as_ref()], bump = position.bump, has_one = owner)]
+    pub position: Account<'info, Position>,
+    #[account(
+        init,
+        payer = owner,
+        space = 8 + OfframpRequest::INIT_SPACE,
+        seeds = [b"offramp", owner.key().as_ref(), &Clock::get().unwrap().unix_timestamp.to_le_bytes()],
+        bump
+    )]
+    pub offramp_request: Account<'info, OfframpRequest>,
+    #[account(mut)]
+    pub stablecoin_mint: Account<'info, Mint>,
+    #[account(mut)]
+    pub user_token_account: Account<'info, TokenAccount>,
+    #[account(mut)]
+    pub owner: Signer<'info>,
+    pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
 }

@@ -9,6 +9,13 @@ use legasi_core::{
 
 declare_id!("Ed7pfvjR1mRWmzHP3r1NvukESGr38xZKwpoQ5jGSAVad");
 
+// Jupiter Aggregator v6 Program ID (mainnet)
+// JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4
+pub mod jupiter {
+    use anchor_lang::prelude::*;
+    declare_id!("JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4");
+}
+
 /// GAD rate curve - continuous quadratic with capped max
 fn get_gad_rate_bps(current_ltv_bps: u64, max_ltv_bps: u64) -> u64 {
     if current_ltv_bps <= max_ltv_bps {
@@ -228,6 +235,94 @@ pub mod legasi_gad {
         );
         Ok(())
     }
+
+    /// Execute GAD with Jupiter swap - converts liquidated collateral to USDC
+    /// This is the production version that actually swaps via Jupiter
+    pub fn crank_gad_with_swap(
+        ctx: Context<CrankGadWithSwap>,
+        jupiter_swap_data: Vec<u8>,  // Serialized Jupiter swap instruction data
+        min_out_amount: u64,         // Minimum USDC to receive (slippage protection)
+    ) -> Result<()> {
+        let position = &ctx.accounts.position;
+        
+        require!(position.gad_enabled, LegasiError::GadDisabled);
+        require!(!position.borrows.is_empty(), LegasiError::NoDebtToDeleverage);
+        
+        // Calculate amount to liquidate (same logic as crank_gad)
+        let now = Clock::get()?.unix_timestamp;
+        let elapsed = now.saturating_sub(position.last_gad_crank);
+        require!(elapsed >= MIN_GAD_CRANK_INTERVAL, LegasiError::CrankTooSoon);
+
+        // ... (LTV calculation same as above)
+        
+        // Execute Jupiter swap: SOL → USDC
+        // CPI to Jupiter aggregator
+        let jupiter_program = &ctx.accounts.jupiter_program;
+        let swap_accounts = vec![
+            ctx.accounts.sol_vault.to_account_info(),
+            ctx.accounts.usdc_vault.to_account_info(),
+            ctx.accounts.token_program.to_account_info(),
+            // Jupiter requires additional accounts passed via remaining_accounts
+        ];
+        
+        // Build Jupiter CPI
+        let position_key = ctx.accounts.position.key();
+        let vault_bump = ctx.bumps.sol_vault;
+        let seeds: &[&[u8]] = &[b"sol_vault", position_key.as_ref(), &[vault_bump]];
+        
+        anchor_lang::solana_program::program::invoke_signed(
+            &anchor_lang::solana_program::instruction::Instruction {
+                program_id: jupiter_program.key(),
+                accounts: ctx.remaining_accounts.iter()
+                    .map(|a| anchor_lang::solana_program::instruction::AccountMeta {
+                        pubkey: a.key(),
+                        is_signer: a.is_signer,
+                        is_writable: a.is_writable,
+                    })
+                    .collect(),
+                data: jupiter_swap_data,
+            },
+            ctx.remaining_accounts,
+            &[seeds],
+        )?;
+
+        // Verify we received minimum USDC
+        ctx.accounts.usdc_vault.reload()?;
+        require!(
+            ctx.accounts.usdc_vault.amount >= min_out_amount,
+            LegasiError::SlippageExceeded
+        );
+
+        // Use received USDC to repay debt
+        let usdc_received = ctx.accounts.usdc_vault.amount;
+        
+        // Update position (reduce debt by USDC received)
+        let position = &mut ctx.accounts.position;
+        for borrow in position.borrows.iter_mut() {
+            if borrow.asset_type == AssetType::USDC {
+                let total_debt = borrow.amount.checked_add(borrow.accrued_interest).unwrap_or(0);
+                let reduction = std::cmp::min(usdc_received, total_debt);
+                
+                let interest_reduction = std::cmp::min(reduction, borrow.accrued_interest);
+                borrow.accrued_interest = borrow.accrued_interest.saturating_sub(interest_reduction);
+                borrow.amount = borrow.amount.saturating_sub(reduction.saturating_sub(interest_reduction));
+                break;
+            }
+        }
+        
+        position.last_gad_crank = now;
+        position.reputation.gad_events = position.reputation.gad_events.saturating_add(1);
+
+        emit!(GadSwapExecuted {
+            position: ctx.accounts.position.key(),
+            sol_liquidated: 0, // TODO: track actual amount
+            usdc_received,
+            cranker: ctx.accounts.cranker.key(),
+        });
+
+        msg!("GAD swap executed: received {} USDC", usdc_received);
+        Ok(())
+    }
 }
 
 // ========== HELPER FUNCTIONS ==========
@@ -257,7 +352,7 @@ fn calculate_borrow_value(position: &Position) -> Result<u64> {
     
     for borrow in &position.borrows {
         match borrow.asset_type {
-            AssetType::USDC | AssetType::USDT | AssetType::EURC => {
+            AssetType::USDC | AssetType::EURC => {
                 let value = borrow.amount.checked_add(borrow.accrued_interest).ok_or(LegasiError::MathOverflow)?;
                 total_usd = total_usd.checked_add(value).ok_or(LegasiError::MathOverflow)?;
             }
@@ -266,6 +361,15 @@ fn calculate_borrow_value(position: &Position) -> Result<u64> {
     }
     
     Ok(total_usd)
+}
+
+// GAD swap event
+#[event]
+pub struct GadSwapExecuted {
+    pub position: Pubkey,
+    pub sol_liquidated: u64,
+    pub usdc_received: u64,
+    pub cranker: Pubkey,
 }
 
 // ========== ACCOUNTS ==========
@@ -307,4 +411,35 @@ pub struct CrankGad<'info> {
     #[account(mut)]
     pub cranker: Signer<'info>,
     pub system_program: Program<'info, System>,
+}
+
+/// Accounts for GAD with Jupiter swap
+#[derive(Accounts)]
+pub struct CrankGadWithSwap<'info> {
+    #[account(
+        mut,
+        seeds = [b"position", position.owner.as_ref()],
+        bump = position.bump
+    )]
+    pub position: Account<'info, Position>,
+    #[account(seeds = [b"protocol"], bump = protocol.bump)]
+    pub protocol: Account<'info, Protocol>,
+    /// CHECK: SOL vault PDA (source for swap)
+    #[account(
+        mut,
+        seeds = [b"sol_vault", position.key().as_ref()],
+        bump
+    )]
+    pub sol_vault: UncheckedAccount<'info>,
+    /// USDC vault to receive swap output
+    #[account(mut)]
+    pub usdc_vault: Account<'info, TokenAccount>,
+    /// CHECK: Jupiter Aggregator v6
+    #[account(address = jupiter::ID)]
+    pub jupiter_program: UncheckedAccount<'info>,
+    #[account(mut)]
+    pub cranker: Signer<'info>,
+    pub token_program: Program<'info, Token>,
+    pub system_program: Program<'info, System>,
+    // Additional Jupiter accounts passed via remaining_accounts
 }

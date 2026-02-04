@@ -1,16 +1,17 @@
 use anchor_lang::prelude::*;
 
-/// Supported collateral asset types
+/// Supported asset types
+/// Collaterals: SOL, cbBTC
+/// Borrowables: USDC, EURC
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq, Debug, InitSpace)]
 #[repr(u8)]
 pub enum AssetType {
-    SOL = 0,
-    USDC = 1,
-    USDT = 2,
-    CbBTC = 3,    // Coinbase wrapped BTC
-    JitoSOL = 4,  // Jito staked SOL
-    MSOL = 5,     // Marinade staked SOL
-    EURC = 6,     // Euro stablecoin
+    // Collaterals
+    SOL = 0,      // Native SOL
+    CbBTC = 1,    // Coinbase wrapped BTC
+    // Borrowables  
+    USDC = 2,     // USD Coin
+    EURC = 3,     // Euro Coin
 }
 
 /// Protocol global state
