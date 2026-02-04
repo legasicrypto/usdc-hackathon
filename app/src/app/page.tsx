@@ -1,291 +1,247 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import Link from 'next/link';
 
 export default function Home() {
   return (
-    <main className="flex flex-col min-h-screen bg-[#0a0a0f]">
+    <main className="min-h-screen bg-[#0c0c0f] text-white">
       {/* Navigation */}
-      <nav className="fixed top-0 left-0 right-0 z-50 backdrop-blur-xl bg-[#0a0a0f]/80 border-b border-white/5">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-400 to-cyan-500 flex items-center justify-center font-bold text-black">
+      <nav className="fixed top-0 left-0 right-0 z-50 bg-[#0c0c0f]/90 backdrop-blur-md border-b border-[#1a1a1f]">
+        <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#00D395] to-[#00A3FF] flex items-center justify-center font-bold text-sm text-black">
               L
             </div>
-            <span className="text-xl font-semibold">Legasi</span>
+            <span className="text-lg font-semibold tracking-tight">Legasi</span>
           </div>
+          
           <div className="hidden md:flex items-center gap-8">
-            <a href="#features" className="text-white/60 hover:text-white transition text-sm">Features</a>
-            <a href="#how-it-works" className="text-white/60 hover:text-white transition text-sm">How it Works</a>
-            <a href="https://github.com/legasicrypto/colosseum-agent-hackathon" target="_blank" className="text-white/60 hover:text-white transition text-sm">GitHub</a>
+            <a href="#features" className="text-[#8a8a8a] hover:text-white transition text-sm">Features</a>
+            <a href="#how-it-works" className="text-[#8a8a8a] hover:text-white transition text-sm">How it Works</a>
+            <a href="https://github.com/legasicrypto/colosseum-agent-hackathon" target="_blank" className="text-[#8a8a8a] hover:text-white transition text-sm">Docs</a>
           </div>
+
           <div className="flex items-center gap-3">
-            <Link 
-              href="/dashboard"
-              className="px-4 py-2 text-sm font-medium text-white/80 hover:text-white transition"
-            >
+            <Link href="/dashboard" className="text-sm text-[#8a8a8a] hover:text-white transition">
               Dashboard
             </Link>
             <a 
               href="https://colosseum.com/agent-hackathon/projects/legasi-credit-protocol"
               target="_blank"
-              className="px-4 py-2 text-sm font-medium bg-gradient-to-r from-emerald-500 to-cyan-500 rounded-lg hover:opacity-90 transition"
+              className="h-9 px-4 bg-[#00D395] hover:bg-[#00B380] text-black text-sm font-medium rounded-lg transition flex items-center"
             >
-              Vote Now
+              Vote
             </a>
           </div>
         </div>
       </nav>
 
-      {/* Hero Section */}
-      <section className="relative pt-32 pb-24 px-6 overflow-hidden">
-        {/* Background gradient */}
-        <div className="absolute inset-0 bg-gradient-to-b from-emerald-500/10 via-transparent to-transparent" />
-        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[800px] h-[800px] bg-emerald-500/20 rounded-full blur-[120px]" />
-        
-        <div className="relative max-w-5xl mx-auto text-center space-y-8">
+      {/* Hero */}
+      <section className="pt-32 pb-20 px-6">
+        <div className="max-w-4xl mx-auto text-center">
           {/* Badge */}
-          <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 rounded-full text-sm">
-            <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
-            <span className="text-white/70">Colosseum Agent Hackathon</span>
+          <div className="inline-flex items-center gap-2 h-8 px-3 bg-[#1a1a1f] border border-[#2a2a2f] rounded-full text-xs text-[#8a8a8a] mb-8">
+            <span className="w-1.5 h-1.5 bg-[#00D395] rounded-full"></span>
+            Colosseum Agent Hackathon
           </div>
 
-          {/* Headline */}
-          <h1 className="text-5xl md:text-7xl lg:text-8xl font-bold tracking-tight">
-            <span className="text-white">Agentic Credit</span>
+          <h1 className="text-5xl md:text-6xl font-semibold tracking-tight leading-[1.1] mb-6">
+            Credit Infrastructure
             <br />
-            <span className="bg-gradient-to-r from-emerald-400 via-cyan-400 to-blue-400 bg-clip-text text-transparent">
-              Infrastructure
-            </span>
+            <span className="text-[#00D395]">for AI Agents</span>
           </h1>
 
-          {/* Subheadline */}
-          <p className="text-lg md:text-xl text-white/60 max-w-2xl mx-auto leading-relaxed">
-            The first lending protocol where AI agents are first-class citizens. 
-            Autonomous borrowing. On-chain reputation. x402 payments.
+          <p className="text-lg text-[#8a8a8a] max-w-2xl mx-auto mb-10 leading-relaxed">
+            The first lending protocol where AI agents are first-class citizens.
+            Autonomous borrowing, on-chain reputation, and x402 native payments.
           </p>
 
-          {/* CTAs */}
-          <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <a 
               href="https://colosseum.com/agent-hackathon/projects/legasi-credit-protocol"
               target="_blank"
-              className="group px-8 py-4 bg-gradient-to-r from-emerald-500 to-cyan-500 rounded-xl font-semibold text-lg hover:shadow-lg hover:shadow-emerald-500/25 transition-all"
+              className="h-12 px-6 bg-[#00D395] hover:bg-[#00B380] text-black font-medium rounded-lg transition flex items-center justify-center gap-2"
             >
-              Support Us on Colosseum
-              <span className="inline-block ml-2 group-hover:translate-x-1 transition-transform">→</span>
+              Vote on Colosseum
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+              </svg>
             </a>
             <Link
               href="/dashboard"
-              className="px-8 py-4 bg-white/5 border border-white/10 rounded-xl font-semibold text-lg hover:bg-white/10 transition"
+              className="h-12 px-6 bg-[#1a1a1f] hover:bg-[#222228] border border-[#2a2a2f] font-medium rounded-lg transition flex items-center justify-center"
             >
-              Try Dashboard
+              Launch App
             </Link>
           </div>
+        </div>
+      </section>
 
-          {/* Stats */}
-          <div className="grid grid-cols-3 gap-8 pt-16 max-w-2xl mx-auto">
-            <StatCard value="6" label="Solana Programs" />
-            <StatCard value="+5%" label="LTV Reputation Bonus" />
-            <StatCard value="x402" label="Native Payments" />
+      {/* Stats */}
+      <section className="py-12 px-6 border-y border-[#1a1a1f]">
+        <div className="max-w-4xl mx-auto grid grid-cols-3 gap-8">
+          <div className="text-center">
+            <div className="text-3xl font-semibold text-[#00D395]">6</div>
+            <div className="text-sm text-[#5a5a5a] mt-1">Solana Programs</div>
+          </div>
+          <div className="text-center">
+            <div className="text-3xl font-semibold text-[#00D395]">+5%</div>
+            <div className="text-sm text-[#5a5a5a] mt-1">Max LTV Bonus</div>
+          </div>
+          <div className="text-center">
+            <div className="text-3xl font-semibold text-[#00D395]">x402</div>
+            <div className="text-sm text-[#5a5a5a] mt-1">Native Payments</div>
           </div>
         </div>
       </section>
 
-      {/* Logos / Social Proof */}
-      <section className="py-16 px-6 border-y border-white/5">
-        <div className="max-w-5xl mx-auto">
-          <p className="text-center text-white/40 text-sm mb-8">BUILT ON</p>
-          <div className="flex justify-center items-center gap-12 flex-wrap">
-            <div className="flex items-center gap-2 text-white/40">
-              <SolanaLogo />
-              <span className="font-medium">Solana</span>
+      {/* Built On */}
+      <section className="py-16 px-6">
+        <div className="max-w-4xl mx-auto">
+          <p className="text-center text-xs text-[#5a5a5a] uppercase tracking-wider mb-8">Built on</p>
+          <div className="flex justify-center items-center gap-16">
+            {/* Solana Logo */}
+            <div className="flex items-center gap-3 text-[#5a5a5a] hover:text-[#8a8a8a] transition">
+              <svg width="28" height="28" viewBox="0 0 397 312" fill="currentColor">
+                <path d="M64.6 237.9c2.4-2.4 5.7-3.8 9.2-3.8h317.4c5.8 0 8.7 7 4.6 11.1l-62.7 62.7c-2.4 2.4-5.7 3.8-9.2 3.8H6.5c-5.8 0-8.7-7-4.6-11.1l62.7-62.7z"/>
+                <path d="M64.6 3.8C67.1 1.4 70.4 0 73.8 0h317.4c5.8 0 8.7 7 4.6 11.1l-62.7 62.7c-2.4 2.4-5.7 3.8-9.2 3.8H6.5c-5.8 0-8.7-7-4.6-11.1L64.6 3.8z"/>
+                <path d="M333.1 120.1c-2.4-2.4-5.7-3.8-9.2-3.8H6.5c-5.8 0-8.7 7-4.6 11.1l62.7 62.7c2.4 2.4 5.7 3.8 9.2 3.8h317.4c5.8 0 8.7-7 4.6-11.1l-62.7-62.7z"/>
+              </svg>
+              <span className="text-sm font-medium">Solana</span>
             </div>
-            <div className="flex items-center gap-2 text-white/40">
-              <span className="text-2xl">⚓</span>
-              <span className="font-medium">Anchor</span>
+            
+            {/* Anchor Logo */}
+            <div className="flex items-center gap-3 text-[#5a5a5a] hover:text-[#8a8a8a] transition">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 2C11.4 2 11 2.4 11 3C11 3.6 11.4 4 12 4C12.6 4 13 3.6 13 3C13 2.4 12.6 2 12 2ZM12 5C10.3 5 9 6.3 9 8H15C15 6.3 13.7 5 12 5ZM6.3 9L4.7 15.6C4.6 16.1 4.8 16.6 5.2 16.9C5.6 17.2 6.1 17.2 6.6 17L8 16.3V22H10V15L12 14L14 15V22H16V16.3L17.4 17C17.9 17.2 18.4 17.2 18.8 16.9C19.2 16.6 19.4 16.1 19.3 15.6L17.7 9H6.3Z"/>
+              </svg>
+              <span className="text-sm font-medium">Anchor</span>
             </div>
-            <div className="flex items-center gap-2 text-white/40">
-              <span className="text-2xl">🔮</span>
-              <span className="font-medium">Pyth</span>
-            </div>
-          </div>
-        </div>
-      </section>
 
-      {/* Problem / Solution */}
-      <section className="py-24 px-6">
-        <div className="max-w-5xl mx-auto">
-          <div className="grid md:grid-cols-2 gap-16 items-center">
-            <div className="space-y-6">
-              <span className="text-emerald-400 font-medium text-sm tracking-wider uppercase">The Problem</span>
-              <h2 className="text-3xl md:text-4xl font-bold">
-                DeFi is built for humans clicking buttons
-              </h2>
-              <p className="text-white/60 text-lg leading-relaxed">
-                AI agents are becoming economic actors. They need to pay for services, 
-                access capital on-demand, and build creditworthiness over time.
-              </p>
-              <p className="text-white/60 text-lg leading-relaxed">
-                But existing protocols require human intervention for every transaction. 
-                That doesn't scale in an agentic economy.
-              </p>
-            </div>
-            <div className="relative">
-              <div className="absolute inset-0 bg-gradient-to-br from-red-500/20 to-orange-500/20 rounded-3xl blur-xl" />
-              <div className="relative bg-white/5 border border-white/10 rounded-3xl p-8 space-y-4">
-                <div className="flex items-center gap-3 text-red-400">
-                  <span className="text-2xl">❌</span>
-                  <span>Manual approval for each borrow</span>
-                </div>
-                <div className="flex items-center gap-3 text-red-400">
-                  <span className="text-2xl">❌</span>
-                  <span>No credit history for agents</span>
-                </div>
-                <div className="flex items-center gap-3 text-red-400">
-                  <span className="text-2xl">❌</span>
-                  <span>Sudden liquidation cascades</span>
-                </div>
-                <div className="flex items-center gap-3 text-red-400">
-                  <span className="text-2xl">❌</span>
-                  <span>No machine-to-machine payments</span>
-                </div>
-              </div>
+            {/* Pyth Logo */}
+            <div className="flex items-center gap-3 text-[#5a5a5a] hover:text-[#8a8a8a] transition">
+              <svg width="28" height="28" viewBox="0 0 100 100" fill="currentColor">
+                <path d="M50 5L90 27.5V72.5L50 95L10 72.5V27.5L50 5ZM50 15L20 32.5V67.5L50 85L80 67.5V32.5L50 15Z"/>
+                <path d="M50 25L70 37.5V62.5L50 75L30 62.5V37.5L50 25Z"/>
+              </svg>
+              <span className="text-sm font-medium">Pyth</span>
             </div>
           </div>
         </div>
       </section>
 
       {/* Features */}
-      <section id="features" className="py-24 px-6 bg-gradient-to-b from-white/[0.02] to-transparent">
-        <div className="max-w-6xl mx-auto">
+      <section id="features" className="py-20 px-6 bg-[#0a0a0d]">
+        <div className="max-w-5xl mx-auto">
           <div className="text-center mb-16">
-            <span className="text-emerald-400 font-medium text-sm tracking-wider uppercase">Features</span>
-            <h2 className="text-3xl md:text-5xl font-bold mt-4">
-              Built for Autonomous Systems
-            </h2>
+            <h2 className="text-3xl font-semibold mb-4">Built for Autonomous Systems</h2>
+            <p className="text-[#8a8a8a]">Everything AI agents need to access capital</p>
           </div>
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
             <FeatureCard
-              icon="🤖"
               title="Autonomous Borrowing"
-              description="Agents borrow within pre-configured limits. No human approval needed per transaction."
+              description="Agents borrow within pre-configured limits without human approval."
             />
             <FeatureCard
-              icon="📊"
               title="On-Chain Reputation"
-              description="Credit score based on repayment history. Score 400+ unlocks +5% LTV bonus."
+              description="Credit score based on repayment history. Score 400+ unlocks +5% LTV."
             />
             <FeatureCard
-              icon="💳"
               title="x402 Payments"
-              description="Native HTTP 402 support. Agents pay for services programmatically."
+              description="Native HTTP 402 support for programmatic machine-to-machine payments."
             />
             <FeatureCard
-              icon="🛡️"
               title="Gradual Deleveraging"
               description="No sudden liquidations. Positions unwound gradually, protecting from MEV."
             />
             <FeatureCard
-              icon="⚡"
               title="Flash Loans"
               description="Zero-collateral loans for arbitrage. 0.09% fee, same-transaction repayment."
             />
             <FeatureCard
-              icon="🔗"
               title="Composable"
-              description="Clean PDAs and CPIs for other protocols to integrate."
+              description="Clean PDAs and CPIs for seamless integration with other protocols."
             />
           </div>
         </div>
       </section>
 
-      {/* How It Works */}
-      <section id="how-it-works" className="py-24 px-6">
-        <div className="max-w-4xl mx-auto">
+      {/* How it Works */}
+      <section id="how-it-works" className="py-20 px-6">
+        <div className="max-w-3xl mx-auto">
           <div className="text-center mb-16">
-            <span className="text-emerald-400 font-medium text-sm tracking-wider uppercase">How It Works</span>
-            <h2 className="text-3xl md:text-5xl font-bold mt-4">
-              Three Steps to Agent Credit
-            </h2>
+            <h2 className="text-3xl font-semibold mb-4">How It Works</h2>
+            <p className="text-[#8a8a8a]">Three steps to agent credit</p>
           </div>
 
-          <div className="space-y-6">
+          <div className="space-y-4">
             <StepCard
-              number={1}
+              number="01"
               title="Configure Agent"
               description="Set credit limits, collateral requirements, and allowed tokens."
-              code="configure_agent(max_borrow: 10_000, min_collateral: 150%)"
             />
             <StepCard
-              number={2}
+              number="02"
               title="Autonomous Borrow"
-              description="Agent borrows within limits when it needs capital."
-              code="agent_borrow(mint: USDC, amount: 1_000)"
+              description="Agent borrows within limits when it needs capital for operations."
             />
             <StepCard
-              number={3}
+              number="03"
               title="Build Reputation"
               description="Each repayment increases credit score. Better score = better rates."
-              code="// Score 400+ → +5% LTV bonus"
             />
           </div>
         </div>
       </section>
 
       {/* CTA */}
-      <section className="py-24 px-6">
-        <div className="max-w-4xl mx-auto">
-          <div className="relative overflow-hidden rounded-3xl">
-            <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/20 via-cyan-500/20 to-blue-500/20" />
-            <div className="absolute inset-0 bg-[#0a0a0f]/80" />
-            <div className="relative p-12 md:p-16 text-center space-y-6">
-              <h2 className="text-3xl md:text-4xl font-bold">
-                Credit Infrastructure for the Agentic Economy
-              </h2>
-              <p className="text-white/60 text-lg max-w-xl mx-auto">
-                Built for the Colosseum Agent Hackathon. Support us with your vote!
-              </p>
-              <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">
-                <a
-                  href="https://colosseum.com/agent-hackathon/projects/legasi-credit-protocol"
-                  target="_blank"
-                  className="px-8 py-4 bg-gradient-to-r from-emerald-500 to-cyan-500 rounded-xl font-semibold text-lg hover:shadow-lg hover:shadow-emerald-500/25 transition-all"
-                >
-                  Vote on Colosseum 🗳️
-                </a>
-                <a
-                  href="https://github.com/legasicrypto/colosseum-agent-hackathon"
-                  target="_blank"
-                  className="px-8 py-4 bg-white/5 border border-white/10 rounded-xl font-semibold text-lg hover:bg-white/10 transition"
-                >
-                  View on GitHub
-                </a>
-              </div>
+      <section className="py-20 px-6">
+        <div className="max-w-3xl mx-auto">
+          <div className="p-8 md:p-12 bg-gradient-to-b from-[#1a1a1f] to-[#0c0c0f] border border-[#2a2a2f] rounded-2xl text-center">
+            <h2 className="text-2xl md:text-3xl font-semibold mb-4">
+              Credit for the Agentic Economy
+            </h2>
+            <p className="text-[#8a8a8a] mb-8 max-w-lg mx-auto">
+              Built for the Colosseum Agent Hackathon. Your vote helps us build the future of agent finance.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <a
+                href="https://colosseum.com/agent-hackathon/projects/legasi-credit-protocol"
+                target="_blank"
+                className="h-12 px-6 bg-[#00D395] hover:bg-[#00B380] text-black font-medium rounded-lg transition flex items-center justify-center"
+              >
+                Vote on Colosseum
+              </a>
+              <a
+                href="https://github.com/legasicrypto/colosseum-agent-hackathon"
+                target="_blank"
+                className="h-12 px-6 bg-[#1a1a1f] hover:bg-[#222228] border border-[#2a2a2f] font-medium rounded-lg transition flex items-center justify-center"
+              >
+                View Code
+              </a>
             </div>
           </div>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="py-12 px-6 border-t border-white/5">
-        <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-400 to-cyan-500 flex items-center justify-center font-bold text-black">
+      <footer className="py-8 px-6 border-t border-[#1a1a1f]">
+        <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
+          <div className="flex items-center gap-2 text-[#5a5a5a]">
+            <div className="w-6 h-6 rounded bg-gradient-to-br from-[#00D395] to-[#00A3FF] flex items-center justify-center font-bold text-[10px] text-black">
               L
             </div>
-            <span className="text-white/60">Built by Bouliche 🎱 for Colosseum</span>
+            <span className="text-sm">Built by Bouliche 🎱</span>
           </div>
-          <div className="flex gap-6">
-            <a href="https://x.com/legasi_xyz" target="_blank" className="text-white/40 hover:text-white transition">
+          <div className="flex gap-6 text-sm">
+            <a href="https://x.com/legasi_xyz" target="_blank" className="text-[#5a5a5a] hover:text-white transition">
               Twitter
             </a>
-            <a href="https://github.com/legasicrypto/colosseum-agent-hackathon" target="_blank" className="text-white/40 hover:text-white transition">
+            <a href="https://github.com/legasicrypto/colosseum-agent-hackathon" target="_blank" className="text-[#5a5a5a] hover:text-white transition">
               GitHub
             </a>
-            <a href="https://colosseum.com/agent-hackathon/projects/legasi-credit-protocol" target="_blank" className="text-white/40 hover:text-white transition">
+            <a href="https://colosseum.com/agent-hackathon/projects/legasi-credit-protocol" target="_blank" className="text-[#5a5a5a] hover:text-white transition">
               Colosseum
             </a>
           </div>
@@ -295,50 +251,23 @@ export default function Home() {
   );
 }
 
-function StatCard({ value, label }: { value: string; label: string }) {
+function FeatureCard({ title, description }: { title: string; description: string }) {
   return (
-    <div className="text-center">
-      <div className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">
-        {value}
-      </div>
-      <div className="text-sm text-white/50 mt-2">{label}</div>
+    <div className="p-6 bg-[#111114] border border-[#1a1a1f] rounded-xl hover:border-[#2a2a2f] transition">
+      <h3 className="text-base font-medium mb-2">{title}</h3>
+      <p className="text-sm text-[#6a6a6a] leading-relaxed">{description}</p>
     </div>
   );
 }
 
-function FeatureCard({ icon, title, description }: { icon: string; title: string; description: string }) {
+function StepCard({ number, title, description }: { number: string; title: string; description: string }) {
   return (
-    <div className="group p-6 rounded-2xl bg-white/[0.02] border border-white/5 hover:border-emerald-500/30 hover:bg-white/[0.04] transition-all">
-      <div className="text-4xl mb-4">{icon}</div>
-      <h3 className="text-xl font-semibold mb-2 group-hover:text-emerald-400 transition">{title}</h3>
-      <p className="text-white/50 leading-relaxed">{description}</p>
-    </div>
-  );
-}
-
-function StepCard({ number, title, description, code }: { number: number; title: string; description: string; code: string }) {
-  return (
-    <div className="flex gap-6 p-6 rounded-2xl bg-white/[0.02] border border-white/5">
-      <div className="flex-shrink-0 w-12 h-12 rounded-full bg-gradient-to-br from-emerald-500 to-cyan-500 flex items-center justify-center text-xl font-bold">
-        {number}
-      </div>
-      <div className="flex-1">
-        <h3 className="text-xl font-semibold mb-2">{title}</h3>
-        <p className="text-white/50 mb-4">{description}</p>
-        <code className="block bg-black/50 px-4 py-3 rounded-lg text-emerald-400 text-sm font-mono border border-white/5">
-          {code}
-        </code>
+    <div className="flex gap-6 p-6 bg-[#111114] border border-[#1a1a1f] rounded-xl">
+      <div className="text-2xl font-semibold text-[#00D395]">{number}</div>
+      <div>
+        <h3 className="text-base font-medium mb-1">{title}</h3>
+        <p className="text-sm text-[#6a6a6a]">{description}</p>
       </div>
     </div>
-  );
-}
-
-function SolanaLogo() {
-  return (
-    <svg width="24" height="24" viewBox="0 0 128 128" fill="currentColor">
-      <path d="M25.4 101.3c0.9-0.9 2.2-1.5 3.5-1.5h91.7c2.2 0 3.3 2.7 1.7 4.3l-17.8 17.8c-0.9 0.9-2.2 1.5-3.5 1.5H9.3c-2.2 0-3.3-2.7-1.7-4.3L25.4 101.3z"/>
-      <path d="M25.4 5.5c1-0.9 2.2-1.5 3.5-1.5h91.7c2.2 0 3.3 2.7 1.7 4.3L104.5 26c-0.9 0.9-2.2 1.5-3.5 1.5H9.3c-2.2 0-3.3-2.7-1.7-4.3L25.4 5.5z"/>
-      <path d="M104.5 53.1c-0.9-0.9-2.2-1.5-3.5-1.5H9.3c-2.2 0-3.3 2.7-1.7 4.3l17.8 17.8c0.9 0.9 2.2 1.5 3.5 1.5h91.7c2.2 0 3.3-2.7 1.7-4.3L104.5 53.1z"/>
-    </svg>
   );
 }
