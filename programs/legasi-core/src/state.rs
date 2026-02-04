@@ -140,3 +140,53 @@ pub struct LpPool {
     pub interest_earned: u64,
     pub bump: u8,
 }
+
+/// Agent-specific position for x402 and autonomous operations
+/// Extends the base Position with agent-specific features
+#[account]
+#[derive(InitSpace)]
+pub struct AgentConfig {
+    /// The position this config extends
+    pub position: Pubkey,
+    /// Human operator (can intervene if needed)
+    pub operator: Pubkey,
+    /// Maximum USDC that can be borrowed per day
+    pub daily_borrow_limit: u64,
+    /// Amount borrowed in current period
+    pub daily_borrowed: u64,
+    /// Period reset timestamp
+    pub period_start: i64,
+    /// Auto-repay incoming USDC to reduce debt
+    pub auto_repay_enabled: bool,
+    /// x402 payment endpoint enabled
+    pub x402_enabled: bool,
+    /// Webhook URL for low balance alerts (stored off-chain, this is just a flag)
+    pub alerts_enabled: bool,
+    /// Minimum collateral ratio before alert (in bps)
+    pub alert_threshold_bps: u16,
+    pub bump: u8,
+}
+
+impl AgentConfig {
+    /// Check if agent can borrow more today
+    pub fn can_borrow(&self, amount: u64, current_time: i64) -> bool {
+        // Reset daily limit if new period
+        let seconds_per_day: i64 = 86400;
+        if current_time - self.period_start >= seconds_per_day {
+            return amount <= self.daily_borrow_limit;
+        }
+        
+        self.daily_borrowed.saturating_add(amount) <= self.daily_borrow_limit
+    }
+    
+    /// Record a borrow against daily limit
+    pub fn record_borrow(&mut self, amount: u64, current_time: i64) {
+        let seconds_per_day: i64 = 86400;
+        if current_time - self.period_start >= seconds_per_day {
+            self.period_start = current_time;
+            self.daily_borrowed = amount;
+        } else {
+            self.daily_borrowed = self.daily_borrowed.saturating_add(amount);
+        }
+    }
+}
