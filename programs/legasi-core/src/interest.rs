@@ -1,5 +1,3 @@
-use anchor_lang::prelude::*;
-
 /// Interest rate model parameters
 /// Uses a two-slope model like Aave/Compound
 

@@ -1014,20 +1014,20 @@ pub struct X402Pay<'info> {
         seeds = [b"position", position.owner.as_ref()],
         bump = position.bump
     )]
-    pub position: Account<'info, Position>,
+    pub position: Box<Account<'info, Position>>,
     #[account(
         mut,
         seeds = [b"agent_config", position.key().as_ref()],
         bump = agent_config.bump,
         constraint = agent_config.position == position.key()
     )]
-    pub agent_config: Account<'info, AgentConfig>,
+    pub agent_config: Box<Account<'info, AgentConfig>>,
     #[account(
         mut,
         seeds = [b"lp_pool", lp_pool.borrowable_mint.as_ref()],
         bump = lp_pool.bump
     )]
-    pub lp_pool: Account<'info, LpPool>,
+    pub lp_pool: Box<Account<'info, LpPool>>,
     #[account(
         mut,
         seeds = [b"lp_vault", lp_pool.borrowable_mint.as_ref()],
@@ -1048,7 +1048,7 @@ pub struct X402Pay<'info> {
         seeds = [b"x402_receipt", payment_request.payment_id.as_ref()],
         bump
     )]
-    pub receipt: Account<'info, X402Receipt>,
+    pub receipt: Box<Account<'info, X402Receipt>>,
     /// The agent making the payment
     #[account(mut, constraint = agent.key() == position.owner)]
     pub agent: Signer<'info>,

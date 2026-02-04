@@ -1,5 +1,3 @@
-use anchor_lang::prelude::*;
-
 /// Pyth Oracle Integration
 /// 
 /// Pyth provides real-time price feeds for crypto assets on Solana.

@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::program::invoke_signed;
 use anchor_lang::solana_program::system_instruction;
-use anchor_spl::token::{self, Token, TokenAccount, Transfer};
+use anchor_spl::token::{Token, TokenAccount};
 
 use legasi_core::{
     state::*, errors::LegasiError, constants::*, events::*,
@@ -41,7 +41,7 @@ pub mod legasi_gad {
     pub fn configure_gad(
         ctx: Context<ConfigureGad>,
         enabled: bool,
-        custom_threshold_bps: Option<u16>,
+        _custom_threshold_bps: Option<u16>,
     ) -> Result<()> {
         let position = &mut ctx.accounts.position;
         position.gad_enabled = enabled;
@@ -258,7 +258,7 @@ pub mod legasi_gad {
         // Execute Jupiter swap: SOL → USDC
         // CPI to Jupiter aggregator
         let jupiter_program = &ctx.accounts.jupiter_program;
-        let swap_accounts = vec![
+        let _swap_accounts = vec![
             ctx.accounts.sol_vault.to_account_info(),
             ctx.accounts.usdc_vault.to_account_info(),
             ctx.accounts.token_program.to_account_info(),
