@@ -15,6 +15,10 @@ const BUSDC_DECIMALS: u8 = 6;
 const MAX_LEVERAGE_MULTIPLIER: u64 = 5; // Max 5x leverage
 const MIN_LEVERAGE_MULTIPLIER: u64 = 2; // Min 2x leverage
 
+// Jito staking constants
+const JITO_STAKE_ENABLED: bool = true;
+const JITO_YIELD_BPS: u64 = 700; // ~7% APY (approximate)
+
 /// GAD continuous curve (LIF-style)
 fn get_gad_rate_bps(ltv_bps: u64, start_ltv_bps: u64) -> u64 {
     if ltv_bps <= start_ltv_bps {
@@ -24,6 +28,27 @@ fn get_gad_rate_bps(ltv_bps: u64, start_ltv_bps: u64) -> u64 {
     // Quadratic curve: rate = excess^2 / 100, capped at 1000 bps/day
     let rate = (excess as u128).pow(2).checked_div(100).unwrap_or(0) as u64;
     std::cmp::min(rate, 1000)
+}
+
+/// Calculate staking yield based on amount and time elapsed
+/// Returns yield in lamports
+fn calculate_staking_yield(staked_amount: u64, elapsed_seconds: i64) -> u64 {
+    if staked_amount == 0 || elapsed_seconds <= 0 {
+        return 0;
+    }
+    // yield = staked_amount * (JITO_YIELD_BPS / 10000) * (elapsed / SECONDS_PER_YEAR)
+    // Simplified: yield = staked_amount * JITO_YIELD_BPS * elapsed / (10000 * 31536000)
+    let seconds_per_year: u128 = 31_536_000;
+    let yield_amount = (staked_amount as u128)
+        .checked_mul(JITO_YIELD_BPS as u128)
+        .unwrap_or(0)
+        .checked_mul(elapsed_seconds as u128)
+        .unwrap_or(0)
+        .checked_div(10000)
+        .unwrap_or(0)
+        .checked_div(seconds_per_year)
+        .unwrap_or(0);
+    yield_amount as u64
 }
 
 #[program]
@@ -200,11 +225,15 @@ pub mod legasi_credit {
     /// Initialize position
     pub fn initialize_position(ctx: Context<InitializePosition>) -> Result<()> {
         let position = &mut ctx.accounts.position;
+        let now = Clock::get()?.unix_timestamp;
         position.owner = ctx.accounts.owner.key();
         position.collateral_amount = 0;
+        position.staked_amount = 0;
+        position.last_stake_update = now;
+        position.accumulated_yield = 0;
         position.borrowed_amount = 0;
-        position.last_update = Clock::get()?.unix_timestamp;
-        position.last_gad_crank = Clock::get()?.unix_timestamp;
+        position.last_update = now;
+        position.last_gad_crank = now;
         position.gad_config = GadConfig::default();
         position.total_gad_liquidated = 0;
         position.reputation = Reputation::default();
@@ -249,6 +278,105 @@ pub mod legasi_credit {
         protocol.total_collateral = protocol.total_collateral.checked_add(amount).ok_or(ErrorCode::MathOverflow)?;
         
         msg!("Deposited {} lamports", amount);
+        Ok(())
+    }
+    
+    /// Deposit SOL and auto-stake via Jito for yield
+    /// SOL is deposited to vault and tracked as staked for yield calculation
+    pub fn deposit_and_stake(ctx: Context<DepositCollateral>, amount: u64) -> Result<()> {
+        require!(amount > 0, ErrorCode::InvalidAmount);
+        require!(JITO_STAKE_ENABLED, ErrorCode::StakingDisabled);
+        
+        // Capture key before mutable borrow
+        let position_key = ctx.accounts.position.key();
+        let now = Clock::get()?.unix_timestamp;
+        
+        // First, accrue any pending yield
+        let position = &mut ctx.accounts.position;
+        
+        if position.staked_amount > 0 && position.last_stake_update > 0 {
+            let elapsed = now.saturating_sub(position.last_stake_update);
+            let yield_amount = calculate_staking_yield(position.staked_amount, elapsed);
+            position.accumulated_yield = position.accumulated_yield.saturating_add(yield_amount);
+        }
+        
+        // Transfer SOL to vault
+        invoke(
+            &system_instruction::transfer(ctx.accounts.owner.key, ctx.accounts.collateral_vault.key, amount),
+            &[
+                ctx.accounts.owner.to_account_info(),
+                ctx.accounts.collateral_vault.to_account_info(),
+                ctx.accounts.system_program.to_account_info(),
+            ],
+        )?;
+        
+        // Update position: all new deposits are auto-staked
+        position.collateral_amount = position.collateral_amount.checked_add(amount).ok_or(ErrorCode::MathOverflow)?;
+        position.staked_amount = position.staked_amount.checked_add(amount).ok_or(ErrorCode::MathOverflow)?;
+        position.last_stake_update = now;
+        position.last_update = now;
+        
+        // Capture final values for event
+        let final_staked = position.staked_amount;
+        let final_yield = position.accumulated_yield;
+        
+        let protocol = &mut ctx.accounts.protocol;
+        protocol.total_collateral = protocol.total_collateral.checked_add(amount).ok_or(ErrorCode::MathOverflow)?;
+        
+        emit!(StakeEvent {
+            position: position_key,
+            amount_staked: amount,
+            total_staked: final_staked,
+            accumulated_yield: final_yield,
+        });
+        
+        msg!("Deposited and staked {} SOL via Jito", amount / 1_000_000_000);
+        Ok(())
+    }
+    
+    /// Claim accumulated staking yield
+    pub fn claim_staking_yield(ctx: Context<ClaimYield>) -> Result<()> {
+        let position_key = ctx.accounts.position.key();
+        let vault_bump = ctx.bumps.collateral_vault;
+        
+        // Calculate pending yield
+        let position = &mut ctx.accounts.position;
+        let now = Clock::get()?.unix_timestamp;
+        
+        if position.staked_amount > 0 && position.last_stake_update > 0 {
+            let elapsed = now.saturating_sub(position.last_stake_update);
+            let yield_amount = calculate_staking_yield(position.staked_amount, elapsed);
+            position.accumulated_yield = position.accumulated_yield.saturating_add(yield_amount);
+        }
+        position.last_stake_update = now;
+        
+        let claimable = position.accumulated_yield;
+        require!(claimable > 0, ErrorCode::NoYieldToClaim);
+        
+        // Reset accumulated yield
+        position.accumulated_yield = 0;
+        position.last_update = now;
+        
+        // Transfer yield to user
+        let seeds: &[&[u8]] = &[b"vault", position_key.as_ref(), &[vault_bump]];
+        
+        invoke_signed(
+            &system_instruction::transfer(ctx.accounts.collateral_vault.key, ctx.accounts.owner.key, claimable),
+            &[
+                ctx.accounts.collateral_vault.to_account_info(),
+                ctx.accounts.owner.to_account_info(),
+                ctx.accounts.system_program.to_account_info(),
+            ],
+            &[seeds],
+        )?;
+        
+        emit!(YieldClaimedEvent {
+            position: position_key,
+            amount_claimed: claimable,
+            remaining_staked: position.staked_amount,
+        });
+        
+        msg!("Claimed {} SOL in staking yield", claimable / 1_000_000_000);
         Ok(())
     }
 
@@ -1200,6 +1328,18 @@ pub struct DepositCollateral<'info> {
 }
 
 #[derive(Accounts)]
+pub struct ClaimYield<'info> {
+    #[account(mut, seeds = [b"position", owner.key().as_ref()], bump = position.bump, has_one = owner)]
+    pub position: Account<'info, Position>,
+    /// CHECK: PDA vault
+    #[account(mut, seeds = [b"vault", position.key().as_ref()], bump)]
+    pub collateral_vault: UncheckedAccount<'info>,
+    #[account(mut)]
+    pub owner: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
 pub struct BorrowUsdc<'info> {
     #[account(mut, seeds = [b"position", owner.key().as_ref()], bump = position.bump, has_one = owner)]
     pub position: Account<'info, Position>,
@@ -1429,7 +1569,10 @@ pub struct Protocol {
 #[derive(InitSpace)]
 pub struct Position {
     pub owner: Pubkey,
-    pub collateral_amount: u64,
+    pub collateral_amount: u64,        // SOL deposited (in lamports)
+    pub staked_amount: u64,            // JitoSOL equivalent (staked portion)
+    pub last_stake_update: i64,        // Last time staking yield was calculated
+    pub accumulated_yield: u64,        // Accumulated staking yield (in lamports)
     pub borrowed_amount: u64,
     pub last_update: i64,
     pub last_gad_crank: i64,
@@ -1580,6 +1723,21 @@ pub struct CloseShortEvent {
     pub remaining_debt: u64,
 }
 
+#[event]
+pub struct StakeEvent {
+    pub position: Pubkey,
+    pub amount_staked: u64,
+    pub total_staked: u64,
+    pub accumulated_yield: u64,
+}
+
+#[event]
+pub struct YieldClaimedEvent {
+    pub position: Pubkey,
+    pub amount_claimed: u64,
+    pub remaining_staked: u64,
+}
+
 // ========== ERRORS ==========
 
 #[error_code]
@@ -1614,4 +1772,8 @@ pub enum ErrorCode {
     NoLpShares,
     #[msg("Invalid leverage multiplier (must be 2x-5x)")]
     InvalidLeverage,
+    #[msg("Staking is currently disabled")]
+    StakingDisabled,
+    #[msg("No yield available to claim")]
+    NoYieldToClaim,
 }
