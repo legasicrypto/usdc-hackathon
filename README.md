@@ -136,10 +136,11 @@ anchor deploy --provider.cluster devnet
 - [x] Reputation system
 - [x] Jupiter integration (liquidation swaps)
 - [x] Bridge off-ramp integration
-- [ ] Pyth oracle integration
-- [ ] x402 native support
-- [ ] Agent SDK
-- [ ] Frontend dApp
+- [x] Pyth oracle integration
+- [x] x402 payment protocol
+- [x] Agent instructions (configure, borrow, auto-repay)
+- [x] Frontend dApp (Next.js 16)
+- [ ] Agent SDK (TypeScript)
 
 ---
 
