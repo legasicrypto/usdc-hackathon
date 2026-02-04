@@ -100,19 +100,19 @@ export default function Home() {
           <div className="flex justify-center items-center gap-16">
             {/* Solana Logo */}
             <div className="flex items-center gap-3 text-[#5a5a5a] hover:text-[#8a8a8a] transition">
-              <img src="/solana-logo.svg" alt="Solana" className="w-7 h-7" />
+              <img src="/solana-logo.svg" alt="Solana" className="h-8 w-auto" />
               <span className="text-sm font-medium">Solana</span>
             </div>
             
             {/* Pyth Logo */}
             <div className="flex items-center gap-3 text-[#5a5a5a] hover:text-[#8a8a8a] transition">
-              <img src="/pyth-logo.svg" alt="Pyth" className="w-7 h-7" />
+              <img src="/pyth-logo.svg" alt="Pyth" className="h-8 w-auto" />
               <span className="text-sm font-medium">Pyth</span>
             </div>
 
             {/* Jupiter Logo */}
             <div className="flex items-center gap-3 text-[#5a5a5a] hover:text-[#8a8a8a] transition">
-              <img src="/jupiter-logo.svg" alt="Jupiter" className="w-7 h-7" />
+              <img src="/jupiter-logo.svg" alt="Jupiter" className="h-8 w-auto" />
               <span className="text-sm font-medium">Jupiter</span>
             </div>
           </div>
