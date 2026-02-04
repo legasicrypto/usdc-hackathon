@@ -25,8 +25,12 @@ pub mod legasi_flash {
     use super::*;
 
     /// Initiate a flash loan - must be repaid in same transaction
-    pub fn flash_borrow(ctx: Context<FlashBorrow>, amount: u64) -> Result<()> {
+    pub fn flash_borrow(ctx: Context<FlashBorrow>, amount: u64, slot: u64) -> Result<()> {
         require!(amount > 0, LegasiError::InvalidAmount);
+        
+        // Verify slot matches current slot (prevents replay)
+        let current_slot = Clock::get()?.slot;
+        require!(slot == current_slot, LegasiError::InvalidSlot);
         require!(
             ctx.accounts.vault.amount >= amount,
             LegasiError::InsufficientLiquidity
@@ -152,12 +156,13 @@ pub mod legasi_flash {
 // ========== ACCOUNTS ==========
 
 #[derive(Accounts)]
+#[instruction(amount: u64, slot: u64)]
 pub struct FlashBorrow<'info> {
     #[account(
         init,
         payer = borrower,
         space = 8 + FlashLoanState::INIT_SPACE,
-        seeds = [b"flash", borrower.key().as_ref(), &Clock::get()?.slot.to_le_bytes()],
+        seeds = [b"flash", borrower.key().as_ref(), &slot.to_le_bytes()],
         bump
     )]
     pub flash_state: Account<'info, FlashLoanState>,

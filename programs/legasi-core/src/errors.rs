@@ -73,4 +73,7 @@ pub enum LegasiError {
 
     #[msg("Max borrow types reached")]
     MaxBorrowTypesReached,
+
+    #[msg("Invalid slot provided")]
+    InvalidSlot,
 }
