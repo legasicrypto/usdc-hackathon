@@ -12,6 +12,8 @@ const GAD_START_LTV_BPS: u64 = 5000; // GAD starts at 50%
 const SECONDS_PER_DAY: i64 = 86400;
 const INSURANCE_FEE_BPS: u64 = 500; // 5% of interest goes to insurance
 const BUSDC_DECIMALS: u8 = 6;
+const MAX_LEVERAGE_MULTIPLIER: u64 = 5; // Max 5x leverage
+const MIN_LEVERAGE_MULTIPLIER: u64 = 2; // Min 2x leverage
 
 /// GAD continuous curve (LIF-style)
 fn get_gad_rate_bps(ltv_bps: u64, start_ltv_bps: u64) -> u64 {
@@ -449,6 +451,328 @@ pub mod legasi_credit {
         Ok(())
     }
 
+    /// One-Click Leverage Long
+    /// Deposits SOL collateral and borrows maximum USDC in one atomic operation.
+    /// The borrowed USDC is intended to be swapped to SOL via Jupiter (client-side)
+    /// and re-deposited for leverage looping.
+    /// 
+    /// Flow (client composes):
+    /// 1. leverage_long(initial_sol, target_leverage) - deposits SOL, borrows USDC
+    /// 2. Jupiter swap USDC → SOL (client instruction)
+    /// 3. leverage_deposit_loop(swapped_sol) - deposits swapped SOL, borrows more USDC
+    /// 4. Repeat 2-3 until target leverage reached
+    pub fn leverage_long(
+        ctx: Context<LeverageLong>,
+        initial_sol_amount: u64,
+        target_leverage_x10: u64, // e.g., 30 = 3.0x leverage
+    ) -> Result<()> {
+        require!(initial_sol_amount > 0, ErrorCode::InvalidAmount);
+        require!(
+            target_leverage_x10 >= MIN_LEVERAGE_MULTIPLIER * 10 && 
+            target_leverage_x10 <= MAX_LEVERAGE_MULTIPLIER * 10,
+            ErrorCode::InvalidLeverage
+        );
+        
+        // Capture keys before mutable borrows
+        let position_key = ctx.accounts.position.key();
+        let protocol_bump = ctx.accounts.protocol.bump;
+        let sol_price = ctx.accounts.protocol.sol_price_usd_6dec;
+        let vault_amount = ctx.accounts.usdc_vault.amount;
+        
+        // Transfer SOL to vault
+        invoke(
+            &system_instruction::transfer(
+                ctx.accounts.owner.key, 
+                ctx.accounts.collateral_vault.key, 
+                initial_sol_amount
+            ),
+            &[
+                ctx.accounts.owner.to_account_info(),
+                ctx.accounts.collateral_vault.to_account_info(),
+                ctx.accounts.system_program.to_account_info(),
+            ],
+        )?;
+        
+        // Update position collateral
+        let position = &mut ctx.accounts.position;
+        position.collateral_amount = position.collateral_amount.checked_add(initial_sol_amount).ok_or(ErrorCode::MathOverflow)?;
+        position.last_update = Clock::get()?.unix_timestamp;
+        
+        // Calculate collateral value in USDC (6 decimals)
+        let collateral_value = (position.collateral_amount as u128)
+            .checked_mul(sol_price as u128)
+            .ok_or(ErrorCode::MathOverflow)?
+            .checked_div(1_000_000_000) // SOL has 9 decimals
+            .ok_or(ErrorCode::MathOverflow)?;
+        
+        // Calculate max borrow with reputation bonus
+        let base_ltv = MAX_LTV_BPS;
+        let bonus = position.reputation.get_ltv_bonus_bps();
+        let effective_ltv = base_ltv.saturating_add(bonus);
+        
+        let max_borrow = collateral_value
+            .checked_mul(effective_ltv as u128)
+            .ok_or(ErrorCode::MathOverflow)?
+            .checked_div(10000)
+            .ok_or(ErrorCode::MathOverflow)? as u64;
+        
+        // Calculate how much to borrow (max possible)
+        let available_to_borrow = max_borrow.saturating_sub(position.borrowed_amount);
+        let borrow_amount = std::cmp::min(available_to_borrow, vault_amount);
+        
+        require!(borrow_amount > 0, ErrorCode::InsufficientLiquidity);
+        
+        // Update position borrowed amount
+        position.borrowed_amount = position.borrowed_amount.checked_add(borrow_amount).ok_or(ErrorCode::MathOverflow)?;
+        
+        // Capture final values for event
+        let final_collateral = position.collateral_amount;
+        let final_debt = position.borrowed_amount;
+        
+        // Calculate achieved leverage (x10 for precision)
+        let current_leverage = if initial_sol_amount > 0 {
+            (final_collateral as u128)
+                .checked_mul(10)
+                .unwrap_or(0)
+                .checked_div(initial_sol_amount as u128)
+                .unwrap_or(10) as u64
+        } else {
+            10 // 1x
+        };
+        
+        // Transfer USDC to user
+        let seeds: &[&[u8]] = &[b"protocol", &[protocol_bump]];
+        
+        token::transfer(
+            CpiContext::new_with_signer(
+                ctx.accounts.token_program.to_account_info(),
+                Transfer {
+                    from: ctx.accounts.usdc_vault.to_account_info(),
+                    to: ctx.accounts.user_usdc.to_account_info(),
+                    authority: ctx.accounts.protocol.to_account_info(),
+                },
+                &[seeds],
+            ),
+            borrow_amount,
+        )?;
+        
+        // Update protocol
+        let protocol = &mut ctx.accounts.protocol;
+        protocol.total_collateral = protocol.total_collateral.checked_add(initial_sol_amount).ok_or(ErrorCode::MathOverflow)?;
+        protocol.total_borrowed = protocol.total_borrowed.checked_add(borrow_amount).ok_or(ErrorCode::MathOverflow)?;
+        
+        emit!(LeverageLongEvent {
+            position: position_key,
+            initial_deposit: initial_sol_amount,
+            total_collateral: final_collateral,
+            borrowed_usdc: borrow_amount,
+            total_debt: final_debt,
+            achieved_leverage_x10: current_leverage,
+            target_leverage_x10,
+        });
+        
+        msg!(
+            "Leverage Long: deposited {} SOL, borrowed {} USDC, leverage {}x",
+            initial_sol_amount / 1_000_000_000,
+            borrow_amount / 1_000_000,
+            current_leverage as f64 / 10.0
+        );
+        
+        Ok(())
+    }
+    
+    /// Deposit additional SOL (from Jupiter swap) and borrow more USDC
+    /// Used as part of leverage looping
+    pub fn leverage_deposit_loop(ctx: Context<LeverageDepositLoop>, sol_amount: u64) -> Result<()> {
+        require!(sol_amount > 0, ErrorCode::InvalidAmount);
+        
+        // Capture keys and values before mutable borrows
+        let position_key = ctx.accounts.position.key();
+        let protocol_bump = ctx.accounts.protocol.bump;
+        let sol_price = ctx.accounts.protocol.sol_price_usd_6dec;
+        let vault_amount = ctx.accounts.usdc_vault.amount;
+        
+        // Transfer SOL to vault
+        invoke(
+            &system_instruction::transfer(
+                ctx.accounts.owner.key, 
+                ctx.accounts.collateral_vault.key, 
+                sol_amount
+            ),
+            &[
+                ctx.accounts.owner.to_account_info(),
+                ctx.accounts.collateral_vault.to_account_info(),
+                ctx.accounts.system_program.to_account_info(),
+            ],
+        )?;
+        
+        // Update position
+        let position = &mut ctx.accounts.position;
+        position.collateral_amount = position.collateral_amount.checked_add(sol_amount).ok_or(ErrorCode::MathOverflow)?;
+        position.last_update = Clock::get()?.unix_timestamp;
+        
+        // Calculate max borrow
+        let collateral_value = (position.collateral_amount as u128)
+            .checked_mul(sol_price as u128)
+            .ok_or(ErrorCode::MathOverflow)?
+            .checked_div(1_000_000_000)
+            .ok_or(ErrorCode::MathOverflow)?;
+        
+        let base_ltv = MAX_LTV_BPS;
+        let bonus = position.reputation.get_ltv_bonus_bps();
+        let effective_ltv = base_ltv.saturating_add(bonus);
+        
+        let max_borrow = collateral_value
+            .checked_mul(effective_ltv as u128)
+            .ok_or(ErrorCode::MathOverflow)?
+            .checked_div(10000)
+            .ok_or(ErrorCode::MathOverflow)? as u64;
+        
+        let available_to_borrow = max_borrow.saturating_sub(position.borrowed_amount);
+        let borrow_amount = std::cmp::min(available_to_borrow, vault_amount);
+        
+        if borrow_amount > 0 {
+            // Transfer USDC
+            let seeds: &[&[u8]] = &[b"protocol", &[protocol_bump]];
+            
+            token::transfer(
+                CpiContext::new_with_signer(
+                    ctx.accounts.token_program.to_account_info(),
+                    Transfer {
+                        from: ctx.accounts.usdc_vault.to_account_info(),
+                        to: ctx.accounts.user_usdc.to_account_info(),
+                        authority: ctx.accounts.protocol.to_account_info(),
+                    },
+                    &[seeds],
+                ),
+                borrow_amount,
+            )?;
+            
+            position.borrowed_amount = position.borrowed_amount.checked_add(borrow_amount).ok_or(ErrorCode::MathOverflow)?;
+        }
+        
+        // Capture final values for event
+        let final_collateral = position.collateral_amount;
+        let final_debt = position.borrowed_amount;
+        
+        // Update protocol
+        let protocol = &mut ctx.accounts.protocol;
+        protocol.total_collateral = protocol.total_collateral.checked_add(sol_amount).ok_or(ErrorCode::MathOverflow)?;
+        if borrow_amount > 0 {
+            protocol.total_borrowed = protocol.total_borrowed.checked_add(borrow_amount).ok_or(ErrorCode::MathOverflow)?;
+        }
+        
+        emit!(LeverageLoopEvent {
+            position: position_key,
+            sol_deposited: sol_amount,
+            usdc_borrowed: borrow_amount,
+            total_collateral: final_collateral,
+            total_debt: final_debt,
+        });
+        
+        msg!("Leverage loop: +{} SOL, +{} USDC borrowed", sol_amount, borrow_amount);
+        
+        Ok(())
+    }
+    
+    /// Deleverage: repay debt and withdraw collateral in one operation
+    /// Used to unwind leveraged positions
+    pub fn deleverage(ctx: Context<Deleverage>, usdc_repay_amount: u64, sol_withdraw_amount: u64) -> Result<()> {
+        // Capture keys and values before mutable borrows
+        let position_key = ctx.accounts.position.key();
+        let vault_bump = ctx.bumps.collateral_vault;
+        let sol_price = ctx.accounts.protocol.sol_price_usd_6dec;
+        let initial_borrowed = ctx.accounts.position.borrowed_amount;
+        let initial_collateral = ctx.accounts.position.collateral_amount;
+        let min_floor = ctx.accounts.position.gad_config.min_collateral_floor;
+        
+        // Repay USDC if amount > 0
+        let actual_repay = std::cmp::min(usdc_repay_amount, initial_borrowed);
+        if actual_repay > 0 {
+            token::transfer(
+                CpiContext::new(
+                    ctx.accounts.token_program.to_account_info(),
+                    Transfer {
+                        from: ctx.accounts.user_usdc.to_account_info(),
+                        to: ctx.accounts.usdc_vault.to_account_info(),
+                        authority: ctx.accounts.owner.to_account_info(),
+                    },
+                ),
+                actual_repay,
+            )?;
+        }
+        
+        // Update position debt
+        let position = &mut ctx.accounts.position;
+        position.borrowed_amount = position.borrowed_amount.saturating_sub(actual_repay);
+        position.last_update = Clock::get()?.unix_timestamp;
+        if actual_repay > 0 {
+            position.reputation.successful_repayments = position.reputation.successful_repayments.saturating_add(1);
+            position.reputation.total_repaid = position.reputation.total_repaid.saturating_add(actual_repay);
+        }
+        
+        // Check if withdrawal is safe
+        let actual_withdraw = std::cmp::min(sol_withdraw_amount, initial_collateral);
+        if actual_withdraw > 0 {
+            let remaining = position.collateral_amount.saturating_sub(actual_withdraw);
+            
+            // Verify LTV after withdrawal
+            if position.borrowed_amount > 0 {
+                let remaining_value = (remaining as u128)
+                    .checked_mul(sol_price as u128)
+                    .ok_or(ErrorCode::MathOverflow)?
+                    .checked_div(1_000_000_000)
+                    .ok_or(ErrorCode::MathOverflow)?;
+                
+                let max_borrow = remaining_value
+                    .checked_mul(MAX_LTV_BPS as u128)
+                    .ok_or(ErrorCode::MathOverflow)?
+                    .checked_div(10000)
+                    .ok_or(ErrorCode::MathOverflow)? as u64;
+                
+                require!(position.borrowed_amount <= max_borrow, ErrorCode::ExceedsLTV);
+            }
+            
+            require!(remaining >= min_floor, ErrorCode::BelowCollateralFloor);
+            
+            // Transfer SOL
+            let seeds: &[&[u8]] = &[b"vault", position_key.as_ref(), &[vault_bump]];
+            
+            invoke_signed(
+                &system_instruction::transfer(ctx.accounts.collateral_vault.key, ctx.accounts.owner.key, actual_withdraw),
+                &[
+                    ctx.accounts.collateral_vault.to_account_info(),
+                    ctx.accounts.owner.to_account_info(),
+                    ctx.accounts.system_program.to_account_info(),
+                ],
+                &[seeds],
+            )?;
+            
+            position.collateral_amount = remaining;
+        }
+        
+        // Capture final values for event
+        let final_collateral = position.collateral_amount;
+        let final_debt = position.borrowed_amount;
+        
+        // Update protocol
+        let protocol = &mut ctx.accounts.protocol;
+        protocol.total_borrowed = protocol.total_borrowed.saturating_sub(actual_repay);
+        protocol.total_collateral = protocol.total_collateral.saturating_sub(actual_withdraw);
+        
+        emit!(DeleverageEvent {
+            position: position_key,
+            usdc_repaid: actual_repay,
+            sol_withdrawn: actual_withdraw,
+            remaining_collateral: final_collateral,
+            remaining_debt: final_debt,
+        });
+        
+        msg!("Deleveraged: repaid {} USDC, withdrew {} SOL", actual_repay, actual_withdraw);
+        
+        Ok(())
+    }
+
     /// GAD Crank
     pub fn crank_gad(ctx: Context<CrankGad>) -> Result<()> {
         let position_key = ctx.accounts.position.key();
@@ -743,6 +1067,63 @@ pub struct CrankGad<'info> {
     pub system_program: Program<'info, System>,
 }
 
+#[derive(Accounts)]
+pub struct LeverageLong<'info> {
+    #[account(mut, seeds = [b"position", owner.key().as_ref()], bump = position.bump, has_one = owner)]
+    pub position: Account<'info, Position>,
+    #[account(mut, seeds = [b"protocol"], bump = protocol.bump)]
+    pub protocol: Account<'info, Protocol>,
+    /// CHECK: PDA vault for collateral
+    #[account(mut, seeds = [b"vault", position.key().as_ref()], bump)]
+    pub collateral_vault: UncheckedAccount<'info>,
+    #[account(mut, seeds = [b"usdc_vault"], bump)]
+    pub usdc_vault: Account<'info, TokenAccount>,
+    #[account(mut)]
+    pub user_usdc: Account<'info, TokenAccount>,
+    #[account(mut)]
+    pub owner: Signer<'info>,
+    pub token_program: Program<'info, Token>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct LeverageDepositLoop<'info> {
+    #[account(mut, seeds = [b"position", owner.key().as_ref()], bump = position.bump, has_one = owner)]
+    pub position: Account<'info, Position>,
+    #[account(mut, seeds = [b"protocol"], bump = protocol.bump)]
+    pub protocol: Account<'info, Protocol>,
+    /// CHECK: PDA vault for collateral
+    #[account(mut, seeds = [b"vault", position.key().as_ref()], bump)]
+    pub collateral_vault: UncheckedAccount<'info>,
+    #[account(mut, seeds = [b"usdc_vault"], bump)]
+    pub usdc_vault: Account<'info, TokenAccount>,
+    #[account(mut)]
+    pub user_usdc: Account<'info, TokenAccount>,
+    #[account(mut)]
+    pub owner: Signer<'info>,
+    pub token_program: Program<'info, Token>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct Deleverage<'info> {
+    #[account(mut, seeds = [b"position", owner.key().as_ref()], bump = position.bump, has_one = owner)]
+    pub position: Account<'info, Position>,
+    #[account(mut, seeds = [b"protocol"], bump = protocol.bump)]
+    pub protocol: Account<'info, Protocol>,
+    /// CHECK: PDA vault for collateral
+    #[account(mut, seeds = [b"vault", position.key().as_ref()], bump)]
+    pub collateral_vault: UncheckedAccount<'info>,
+    #[account(mut, seeds = [b"usdc_vault"], bump)]
+    pub usdc_vault: Account<'info, TokenAccount>,
+    #[account(mut)]
+    pub user_usdc: Account<'info, TokenAccount>,
+    #[account(mut)]
+    pub owner: Signer<'info>,
+    pub token_program: Program<'info, Token>,
+    pub system_program: Program<'info, System>,
+}
+
 // ========== DATA ==========
 
 #[account]
@@ -855,6 +1236,35 @@ pub struct FlashLoanRepaid {
     pub fee: u64,
 }
 
+#[event]
+pub struct LeverageLongEvent {
+    pub position: Pubkey,
+    pub initial_deposit: u64,
+    pub total_collateral: u64,
+    pub borrowed_usdc: u64,
+    pub total_debt: u64,
+    pub achieved_leverage_x10: u64,
+    pub target_leverage_x10: u64,
+}
+
+#[event]
+pub struct LeverageLoopEvent {
+    pub position: Pubkey,
+    pub sol_deposited: u64,
+    pub usdc_borrowed: u64,
+    pub total_collateral: u64,
+    pub total_debt: u64,
+}
+
+#[event]
+pub struct DeleverageEvent {
+    pub position: Pubkey,
+    pub usdc_repaid: u64,
+    pub sol_withdrawn: u64,
+    pub remaining_collateral: u64,
+    pub remaining_debt: u64,
+}
+
 // ========== ERRORS ==========
 
 #[error_code]
@@ -887,4 +1297,6 @@ pub enum ErrorCode {
     InvalidGadConfig,
     #[msg("No LP shares")]
     NoLpShares,
+    #[msg("Invalid leverage multiplier (must be 2x-5x)")]
+    InvalidLeverage,
 }
