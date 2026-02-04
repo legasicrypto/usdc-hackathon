@@ -145,22 +145,27 @@ await legasi.repay({ amount: earnings });
 
 ## Roadmap
 
-### Hackathon (Now)
+### Hackathon (Completed ✅)
 - [x] Core lending: deposit, borrow, repay, withdraw
-- [x] GAD mechanism
-- [ ] LP system + bUSDC token
-- [ ] Flash loans
-- [ ] One-click leverage
-- [ ] Jito auto-staking
-- [ ] Reputation system
-- [ ] Frontend
+- [x] GAD mechanism (continuous curve, no hard liquidations)
+- [x] LP system + bUSDC token (deposit/withdraw with yield)
+- [x] Flash loans (0.05% fee, atomic execution)
+- [x] One-click leverage (long & short, up to 5x)
+- [x] Jito auto-staking (~7% APY simulation)
+- [x] Reputation system (score-based LTV bonuses)
+- [x] Insurance fund (5% of interest)
+- [x] Multi-market architecture with eMode
+- [x] Frontend (Next.js + Tailwind + Wallet Adapter)
+- [x] Waitlist + referral system
+- [x] Bridge.xyz off-ramp integration
 
 ### Post-Hackathon
-- [ ] Pyth oracle integration
-- [ ] Multi-collateral (cbBTC, JitoSOL)
+- [ ] Pyth oracle integration (live price feeds)
+- [ ] Multi-collateral (cbBTC, JitoSOL, mSOL)
 - [ ] Multi-loan (EURC, USDT)
-- [ ] eMode for correlated assets
-- [ ] Governance
+- [ ] Real Jito CPI integration
+- [ ] Governance token
+- [ ] Mainnet deployment
 
 ---
 
