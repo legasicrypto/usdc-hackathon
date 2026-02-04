@@ -6,11 +6,13 @@ pub mod state;
 pub mod errors;
 pub mod constants;
 pub mod events;
+pub mod interest;
 
 pub use state::*;
 pub use errors::*;
 pub use constants::*;
 pub use events::*;
+pub use interest::*;
 
 #[program]
 pub mod legasi_core {

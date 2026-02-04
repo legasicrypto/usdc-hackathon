@@ -335,6 +335,52 @@ pub mod legasi_lending {
         Ok(())
     }
 
+    /// Accrue interest on a position's borrows
+    /// Can be called by anyone (cranker) to update interest
+    pub fn accrue_position_interest(ctx: Context<AccruePositionInterest>) -> Result<()> {
+        let position = &mut ctx.accounts.position;
+        let now = Clock::get()?.unix_timestamp;
+        let elapsed = now.saturating_sub(position.last_update);
+        
+        // Skip if updated recently (< 1 hour)
+        if elapsed < 3600 {
+            return Ok(());
+        }
+        
+        for borrow in position.borrows.iter_mut() {
+            // Get interest rate for this asset (from borrowable config)
+            let annual_rate_bps = match borrow.asset_type {
+                AssetType::USDC => 800,  // 8% APR
+                AssetType::EURC => 700,  // 7% APR
+                _ => 0,
+            };
+            
+            if annual_rate_bps == 0 || borrow.amount == 0 {
+                continue;
+            }
+            
+            // Calculate interest: principal * rate * time / year
+            // Using seconds: interest = amount * rate_bps * elapsed / (365.25 * 24 * 3600 * 10000)
+            let seconds_per_year: u128 = 31_557_600; // 365.25 days
+            let interest = (borrow.amount as u128)
+                .checked_mul(annual_rate_bps as u128)
+                .unwrap_or(0)
+                .checked_mul(elapsed as u128)
+                .unwrap_or(0)
+                .checked_div(seconds_per_year)
+                .unwrap_or(0)
+                .checked_div(BPS_DENOMINATOR as u128)
+                .unwrap_or(0) as u64;
+            
+            borrow.accrued_interest = borrow.accrued_interest.saturating_add(interest);
+        }
+        
+        position.last_update = now;
+        
+        msg!("Interest accrued for position");
+        Ok(())
+    }
+
     /// Off-ramp borrowed stablecoins via Bridge.xyz
     /// Burns the borrowed tokens and initiates fiat transfer
     pub fn offramp_via_bridge(
@@ -539,4 +585,15 @@ pub struct OfframpViaBridge<'info> {
     pub owner: Signer<'info>,
     pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
+}
+
+/// Accrue interest on a position (permissionless - anyone can crank)
+#[derive(Accounts)]
+pub struct AccruePositionInterest<'info> {
+    #[account(
+        mut,
+        seeds = [b"position", position.owner.as_ref()],
+        bump = position.bump
+    )]
+    pub position: Account<'info, Position>,
 }
