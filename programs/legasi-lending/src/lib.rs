@@ -435,6 +435,196 @@ pub mod legasi_lending {
         msg!("Off-ramp requested: {} USDC to {}", amount, destination_name);
         Ok(())
     }
+
+    // ========== AGENT FUNCTIONS ==========
+
+    /// Configure agent settings for a position
+    /// Only the position owner can call this
+    pub fn configure_agent(
+        ctx: Context<ConfigureAgent>,
+        daily_borrow_limit: u64,
+        auto_repay_enabled: bool,
+        x402_enabled: bool,
+        alert_threshold_bps: u16,
+    ) -> Result<()> {
+        let agent_config = &mut ctx.accounts.agent_config;
+        agent_config.position = ctx.accounts.position.key();
+        agent_config.operator = ctx.accounts.owner.key();
+        agent_config.daily_borrow_limit = daily_borrow_limit;
+        agent_config.daily_borrowed = 0;
+        agent_config.period_start = Clock::get()?.unix_timestamp;
+        agent_config.auto_repay_enabled = auto_repay_enabled;
+        agent_config.x402_enabled = x402_enabled;
+        agent_config.alerts_enabled = true;
+        agent_config.alert_threshold_bps = alert_threshold_bps;
+        agent_config.bump = ctx.bumps.agent_config;
+
+        msg!("Agent configured with {} daily limit", daily_borrow_limit);
+        Ok(())
+    }
+
+    /// Agent borrow - respects daily limits
+    /// Can be called by the agent (position owner) autonomously
+    pub fn agent_borrow(ctx: Context<AgentBorrow>, amount: u64) -> Result<()> {
+        require!(amount > 0, LegasiError::InvalidAmount);
+        
+        let agent_config = &ctx.accounts.agent_config;
+        let now = Clock::get()?.unix_timestamp;
+        
+        // Check daily limit
+        require!(
+            agent_config.can_borrow(amount, now),
+            LegasiError::ExceedsLTV // Reuse error for "exceeds limit"
+        );
+
+        // Get price and calculate max borrow (same as regular borrow)
+        let sol_price = ctx.accounts.sol_price_feed.price_usd_6dec;
+        
+        let mut total_collateral_usd: u64 = 0;
+        for deposit in &ctx.accounts.position.collaterals {
+            if deposit.asset_type == AssetType::SOL || deposit.asset_type == AssetType::CbBTC {
+                let value = (deposit.amount as u128)
+                    .checked_mul(sol_price as u128)
+                    .ok_or(LegasiError::MathOverflow)?
+                    .checked_div(LAMPORTS_PER_SOL as u128)
+                    .ok_or(LegasiError::MathOverflow)? as u64;
+                total_collateral_usd = total_collateral_usd.checked_add(value).ok_or(LegasiError::MathOverflow)?;
+            }
+        }
+
+        let mut current_borrow_usd: u64 = 0;
+        for borrow in &ctx.accounts.position.borrows {
+            let value = borrow.amount.checked_add(borrow.accrued_interest).ok_or(LegasiError::MathOverflow)?;
+            current_borrow_usd = current_borrow_usd.checked_add(value).ok_or(LegasiError::MathOverflow)?;
+        }
+
+        // Apply reputation bonus to LTV
+        let base_ltv = DEFAULT_SOL_MAX_LTV_BPS as u64;
+        let reputation_bonus = ctx.accounts.position.reputation.get_ltv_bonus_bps() as u64;
+        let effective_ltv = base_ltv.saturating_add(reputation_bonus);
+
+        let max_borrow = total_collateral_usd
+            .checked_mul(effective_ltv)
+            .ok_or(LegasiError::MathOverflow)?
+            .checked_div(BPS_DENOMINATOR)
+            .ok_or(LegasiError::MathOverflow)?;
+
+        let new_total_borrow = current_borrow_usd.checked_add(amount).ok_or(LegasiError::MathOverflow)?;
+        require!(new_total_borrow <= max_borrow, LegasiError::ExceedsLTV);
+
+        // Transfer from vault to agent
+        let pool_bump = ctx.accounts.lp_pool.bump;
+        let borrowable_mint = ctx.accounts.lp_pool.borrowable_mint;
+        let seeds: &[&[u8]] = &[b"lp_pool", borrowable_mint.as_ref(), &[pool_bump]];
+
+        token::transfer(
+            CpiContext::new_with_signer(
+                ctx.accounts.token_program.to_account_info(),
+                Transfer {
+                    from: ctx.accounts.borrow_vault.to_account_info(),
+                    to: ctx.accounts.agent_token_account.to_account_info(),
+                    authority: ctx.accounts.lp_pool.to_account_info(),
+                },
+                &[seeds],
+            ),
+            amount,
+        )?;
+
+        // Update position
+        let position = &mut ctx.accounts.position;
+        let asset_type = AssetType::USDC; // Default to USDC for agents
+        
+        let mut found = false;
+        for borrow in position.borrows.iter_mut() {
+            if borrow.asset_type == asset_type {
+                borrow.amount = borrow.amount.checked_add(amount).ok_or(LegasiError::MathOverflow)?;
+                found = true;
+                break;
+            }
+        }
+        if !found {
+            require!(position.borrows.len() < 4, LegasiError::MaxBorrowTypesReached);
+            position.borrows.push(BorrowedAmount {
+                asset_type,
+                amount,
+                accrued_interest: 0,
+            });
+        }
+        position.last_update = now;
+
+        // Update agent config daily borrowed
+        let agent_config = &mut ctx.accounts.agent_config;
+        agent_config.record_borrow(amount, now);
+
+        // Update pool
+        let lp_pool = &mut ctx.accounts.lp_pool;
+        lp_pool.total_borrowed = lp_pool.total_borrowed.checked_add(amount).ok_or(LegasiError::MathOverflow)?;
+
+        emit!(AgentBorrowed {
+            position: ctx.accounts.position.key(),
+            amount,
+            daily_remaining: agent_config.daily_borrow_limit.saturating_sub(agent_config.daily_borrowed),
+        });
+
+        msg!("Agent borrowed {} USDC", amount);
+        Ok(())
+    }
+
+    /// Agent auto-repay - automatically repay debt when USDC is received
+    pub fn agent_auto_repay(ctx: Context<AgentAutoRepay>, amount: u64) -> Result<()> {
+        require!(amount > 0, LegasiError::InvalidAmount);
+        require!(ctx.accounts.agent_config.auto_repay_enabled, LegasiError::Unauthorized);
+
+        // Transfer from agent to vault
+        token::transfer(
+            CpiContext::new(
+                ctx.accounts.token_program.to_account_info(),
+                Transfer {
+                    from: ctx.accounts.agent_token_account.to_account_info(),
+                    to: ctx.accounts.borrow_vault.to_account_info(),
+                    authority: ctx.accounts.agent.to_account_info(),
+                },
+            ),
+            amount,
+        )?;
+
+        // Reduce debt
+        let position = &mut ctx.accounts.position;
+        let mut remaining = amount;
+        
+        for borrow in position.borrows.iter_mut() {
+            if remaining == 0 { break; }
+            
+            // First reduce interest
+            let interest_payment = std::cmp::min(remaining, borrow.accrued_interest);
+            borrow.accrued_interest = borrow.accrued_interest.saturating_sub(interest_payment);
+            remaining = remaining.saturating_sub(interest_payment);
+            
+            // Then principal
+            let principal_payment = std::cmp::min(remaining, borrow.amount);
+            borrow.amount = borrow.amount.saturating_sub(principal_payment);
+            remaining = remaining.saturating_sub(principal_payment);
+        }
+
+        position.borrows.retain(|b| b.amount > 0 || b.accrued_interest > 0);
+        position.last_update = Clock::get()?.unix_timestamp;
+        position.reputation.successful_repayments = position.reputation.successful_repayments.saturating_add(1);
+        position.reputation.total_repaid_usd = position.reputation.total_repaid_usd.saturating_add(amount);
+
+        // Update pool
+        let lp_pool = &mut ctx.accounts.lp_pool;
+        lp_pool.total_borrowed = lp_pool.total_borrowed.saturating_sub(amount.saturating_sub(remaining));
+
+        msg!("Agent auto-repaid {} USDC", amount.saturating_sub(remaining));
+        Ok(())
+    }
+}
+
+#[event]
+pub struct AgentBorrowed {
+    pub position: Pubkey,
+    pub amount: u64,
+    pub daily_remaining: u64,
 }
 
 /// Off-ramp request status
@@ -596,4 +786,98 @@ pub struct AccruePositionInterest<'info> {
         bump = position.bump
     )]
     pub position: Account<'info, Position>,
+}
+
+// ========== AGENT ACCOUNTS ==========
+
+#[derive(Accounts)]
+pub struct ConfigureAgent<'info> {
+    #[account(
+        seeds = [b"position", owner.key().as_ref()],
+        bump = position.bump,
+        has_one = owner
+    )]
+    pub position: Account<'info, Position>,
+    #[account(
+        init,
+        payer = owner,
+        space = 8 + AgentConfig::INIT_SPACE,
+        seeds = [b"agent_config", position.key().as_ref()],
+        bump
+    )]
+    pub agent_config: Account<'info, AgentConfig>,
+    #[account(mut)]
+    pub owner: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct AgentBorrow<'info> {
+    #[account(
+        mut,
+        seeds = [b"position", position.owner.as_ref()],
+        bump = position.bump
+    )]
+    pub position: Account<'info, Position>,
+    #[account(
+        mut,
+        seeds = [b"agent_config", position.key().as_ref()],
+        bump = agent_config.bump,
+        constraint = agent_config.position == position.key()
+    )]
+    pub agent_config: Account<'info, AgentConfig>,
+    #[account(
+        mut,
+        seeds = [b"lp_pool", lp_pool.borrowable_mint.as_ref()],
+        bump = lp_pool.bump
+    )]
+    pub lp_pool: Account<'info, LpPool>,
+    #[account(
+        mut,
+        seeds = [b"lp_vault", lp_pool.borrowable_mint.as_ref()],
+        bump
+    )]
+    pub borrow_vault: Account<'info, TokenAccount>,
+    #[account(mut)]
+    pub agent_token_account: Account<'info, TokenAccount>,
+    #[account(seeds = [b"price", &[AssetType::SOL as u8]], bump = sol_price_feed.bump)]
+    pub sol_price_feed: Account<'info, PriceFeed>,
+    /// The agent (position owner) executing the borrow
+    #[account(constraint = agent.key() == position.owner)]
+    pub agent: Signer<'info>,
+    pub token_program: Program<'info, Token>,
+}
+
+#[derive(Accounts)]
+pub struct AgentAutoRepay<'info> {
+    #[account(
+        mut,
+        seeds = [b"position", position.owner.as_ref()],
+        bump = position.bump
+    )]
+    pub position: Account<'info, Position>,
+    #[account(
+        seeds = [b"agent_config", position.key().as_ref()],
+        bump = agent_config.bump,
+        constraint = agent_config.position == position.key()
+    )]
+    pub agent_config: Account<'info, AgentConfig>,
+    #[account(
+        mut,
+        seeds = [b"lp_pool", lp_pool.borrowable_mint.as_ref()],
+        bump = lp_pool.bump
+    )]
+    pub lp_pool: Account<'info, LpPool>,
+    #[account(
+        mut,
+        seeds = [b"lp_vault", lp_pool.borrowable_mint.as_ref()],
+        bump
+    )]
+    pub borrow_vault: Account<'info, TokenAccount>,
+    #[account(mut)]
+    pub agent_token_account: Account<'info, TokenAccount>,
+    /// The agent executing auto-repay
+    #[account(constraint = agent.key() == position.owner)]
+    pub agent: Signer<'info>,
+    pub token_program: Program<'info, Token>,
 }
