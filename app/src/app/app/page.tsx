@@ -4,6 +4,7 @@ import { useWallet } from '@solana/wallet-adapter-react';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import Link from 'next/link';
 import { useState } from 'react';
+import OffRampModal from '@/components/offramp/OffRampModal';
 
 // Mock data - will be replaced with real contract calls
 const mockPosition = {
@@ -25,6 +26,7 @@ const mockPosition = {
 export default function AppPage() {
   const { connected, publicKey } = useWallet();
   const [activeTab, setActiveTab] = useState<'deposit' | 'borrow' | 'leverage'>('deposit');
+  const [showOffRamp, setShowOffRamp] = useState(false);
 
   if (!connected) {
     return (
@@ -73,8 +75,23 @@ export default function AppPage() {
             </button>
           </div>
         </div>
-        <WalletMultiButton />
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setShowOffRamp(true)}
+            className="px-4 py-2 bg-gradient-to-r from-green-500 to-emerald-600 rounded-lg font-semibold text-sm hover:opacity-90 transition"
+          >
+            💸 Cash Out
+          </button>
+          <WalletMultiButton />
+        </div>
       </nav>
+
+      {/* Off-Ramp Modal */}
+      <OffRampModal
+        isOpen={showOffRamp}
+        onClose={() => setShowOffRamp(false)}
+        maxAmount={1000} // Mock available balance
+      />
 
       <div className="max-w-7xl mx-auto px-6 py-8">
         {/* Position Overview */}
