@@ -1,0 +1,604 @@
+{
+  "address": "24zjRceYHjkyP8Nr4bc4q9T7TBbkf292gFocGp6SM5Fz",
+  "metadata": {
+    "name": "legasi_flash",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Legasi Flash - Uncollateralized flash loans"
+  },
+  "instructions": [
+    {
+      "name": "close_flash_state",
+      "docs": [
+        "Close flash loan state account (cleanup after repayment)"
+      ],
+      "discriminator": [
+        133,
+        155,
+        220,
+        223,
+        234,
+        86,
+        11,
+        247
+      ],
+      "accounts": [
+        {
+          "name": "flash_state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  102,
+                  108,
+                  97,
+                  115,
+                  104
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "borrower"
+              },
+              {
+                "kind": "account",
+                "path": "flash_state.initiated_slot",
+                "account": "FlashLoanState"
+              }
+            ]
+          }
+        },
+        {
+          "name": "borrower",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "flash_state"
+          ]
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "flash_borrow",
+      "docs": [
+        "Initiate a flash loan - must be repaid in same transaction"
+      ],
+      "discriminator": [
+        166,
+        221,
+        220,
+        25,
+        61,
+        73,
+        127,
+        240
+      ],
+      "accounts": [
+        {
+          "name": "flash_state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  102,
+                  108,
+                  97,
+                  115,
+                  104
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "borrower"
+              },
+              {
+                "kind": "arg",
+                "path": "slot"
+              }
+            ]
+          }
+        },
+        {
+          "name": "lp_pool",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  112,
+                  95,
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "borrowable.mint",
+                "account": "Borrowable"
+              }
+            ]
+          }
+        },
+        {
+          "name": "borrowable",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  111,
+                  114,
+                  114,
+                  111,
+                  119,
+                  97,
+                  98,
+                  108,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "borrowable.mint",
+                "account": "Borrowable"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  112,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "borrowable.mint",
+                "account": "Borrowable"
+              }
+            ]
+          }
+        },
+        {
+          "name": "user_token_account",
+          "writable": true
+        },
+        {
+          "name": "borrower",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        },
+        {
+          "name": "slot",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "flash_repay",
+      "docs": [
+        "Repay flash loan + fee - must be in same transaction as borrow"
+      ],
+      "discriminator": [
+        182,
+        143,
+        19,
+        23,
+        39,
+        221,
+        184,
+        78
+      ],
+      "accounts": [
+        {
+          "name": "flash_state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  102,
+                  108,
+                  97,
+                  115,
+                  104
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "borrower"
+              },
+              {
+                "kind": "account",
+                "path": "flash_state.initiated_slot",
+                "account": "FlashLoanState"
+              }
+            ]
+          }
+        },
+        {
+          "name": "lp_pool",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  112,
+                  95,
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "lp_pool.borrowable_mint",
+                "account": "LpPool"
+              }
+            ]
+          }
+        },
+        {
+          "name": "protocol",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  112,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "lp_pool.borrowable_mint",
+                "account": "LpPool"
+              }
+            ]
+          }
+        },
+        {
+          "name": "user_token_account",
+          "writable": true
+        },
+        {
+          "name": "borrower",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "flash_state"
+          ]
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": []
+    }
+  ],
+  "accounts": [
+    {
+      "name": "Borrowable",
+      "discriminator": [
+        133,
+        45,
+        237,
+        66,
+        89,
+        207,
+        15,
+        91
+      ]
+    },
+    {
+      "name": "FlashLoanState",
+      "discriminator": [
+        110,
+        100,
+        101,
+        118,
+        31,
+        199,
+        19,
+        20
+      ]
+    },
+    {
+      "name": "LpPool",
+      "discriminator": [
+        185,
+        127,
+        131,
+        141,
+        197,
+        198,
+        170,
+        147
+      ]
+    },
+    {
+      "name": "Protocol",
+      "discriminator": [
+        45,
+        39,
+        101,
+        43,
+        115,
+        72,
+        131,
+        40
+      ]
+    }
+  ],
+  "types": [
+    {
+      "name": "AssetType",
+      "docs": [
+        "Supported asset types",
+        "Collaterals: SOL, cbBTC",
+        "Borrowables: USDC, EURC"
+      ],
+      "repr": {
+        "kind": "rust"
+      },
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "SOL"
+          },
+          {
+            "name": "CbBTC"
+          },
+          {
+            "name": "USDC"
+          },
+          {
+            "name": "EURC"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Borrowable",
+      "docs": [
+        "Borrowable asset configuration"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "oracle",
+            "type": "pubkey"
+          },
+          {
+            "name": "interest_rate_bps",
+            "type": "u16"
+          },
+          {
+            "name": "decimals",
+            "type": "u8"
+          },
+          {
+            "name": "is_active",
+            "type": "bool"
+          },
+          {
+            "name": "total_borrowed",
+            "type": "u64"
+          },
+          {
+            "name": "total_available",
+            "type": "u64"
+          },
+          {
+            "name": "asset_type",
+            "type": {
+              "defined": {
+                "name": "AssetType"
+              }
+            }
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "FlashLoanState",
+      "docs": [
+        "Flash loan state (tracks outstanding loans in a transaction)"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "borrower",
+            "type": "pubkey"
+          },
+          {
+            "name": "asset_type",
+            "type": {
+              "defined": {
+                "name": "AssetType"
+              }
+            }
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "fee",
+            "type": "u64"
+          },
+          {
+            "name": "initiated_slot",
+            "type": "u64"
+          },
+          {
+            "name": "repaid",
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "LpPool",
+      "docs": [
+        "LP pool for a borrowable asset"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "borrowable_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "lp_token_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "total_deposits",
+            "type": "u64"
+          },
+          {
+            "name": "total_shares",
+            "type": "u64"
+          },
+          {
+            "name": "total_borrowed",
+            "type": "u64"
+          },
+          {
+            "name": "interest_earned",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Protocol",
+      "docs": [
+        "Protocol global state"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "treasury",
+            "type": "pubkey"
+          },
+          {
+            "name": "insurance_fund",
+            "type": "u64"
+          },
+          {
+            "name": "total_collateral_usd",
+            "type": "u64"
+          },
+          {
+            "name": "total_borrowed_usd",
+            "type": "u64"
+          },
+          {
+            "name": "paused",
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    }
+  ]
+}

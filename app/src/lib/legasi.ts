@@ -2,6 +2,11 @@ import { Program, AnchorProvider, BN, Idl } from "@coral-xyz/anchor";
 import { Connection, PublicKey, SystemProgram, LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
 
+// Import IDLs
+import LegasiCoreIDL from "@/idl/legasi_core.json";
+import LegasiLendingIDL from "@/idl/legasi_lending.json";
+import LegasiLpIDL from "@/idl/legasi_lp.json";
+
 // Program IDs
 export const LEGASI_CORE_PROGRAM_ID = new PublicKey("5Mru5amfomEPqNiEULRuHpgAZyyENqyCeNnkSoh7QjLy");
 export const LEGASI_LENDING_PROGRAM_ID = new PublicKey("DGRYqD9Hg9v27Fa9kLUUf3KY9hoprjBQp7y88qG9q88u");
@@ -266,20 +271,10 @@ export class LegasiClient {
 export async function createLegasiClient(
   provider: AnchorProvider
 ): Promise<LegasiClient> {
-  // Note: In production, import IDLs from target/idl/*.json
-  // For now, we'll create minimal program interfaces
-  
-  const coreIdl = await Program.fetchIdl(LEGASI_CORE_PROGRAM_ID, provider);
-  const lendingIdl = await Program.fetchIdl(LEGASI_LENDING_PROGRAM_ID, provider);
-  const lpIdl = await Program.fetchIdl(LEGASI_LP_PROGRAM_ID, provider);
-  
-  if (!coreIdl || !lendingIdl || !lpIdl) {
-    throw new Error("Failed to fetch program IDLs");
-  }
-  
-  const coreProgram = new Program(coreIdl, provider);
-  const lendingProgram = new Program(lendingIdl, provider);
-  const lpProgram = new Program(lpIdl, provider);
+  // Use local IDLs (bundled with the app)
+  const coreProgram = new Program(LegasiCoreIDL as Idl, provider);
+  const lendingProgram = new Program(LegasiLendingIDL as Idl, provider);
+  const lpProgram = new Program(LegasiLpIDL as Idl, provider);
   
   return new LegasiClient(provider, coreProgram, lendingProgram, lpProgram);
 }

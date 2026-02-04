@@ -1,0 +1,1754 @@
+{
+  "address": "5Mru5amfomEPqNiEULRuHpgAZyyENqyCeNnkSoh7QjLy",
+  "metadata": {
+    "name": "legasi_core",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Legasi Core - Shared types, state, and errors"
+  },
+  "instructions": [
+    {
+      "name": "initialize_price_feed",
+      "docs": [
+        "Initialize a price feed for a token (keyed by mint)"
+      ],
+      "discriminator": [
+        68,
+        180,
+        81,
+        20,
+        102,
+        213,
+        145,
+        233
+      ],
+      "accounts": [
+        {
+          "name": "protocol",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "price_feed",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  105,
+                  99,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "mint"
+        },
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "protocol"
+          ]
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "asset_type",
+          "type": {
+            "defined": {
+              "name": "AssetType"
+            }
+          }
+        },
+        {
+          "name": "initial_price_usd",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "initialize_protocol",
+      "docs": [
+        "Initialize the protocol state"
+      ],
+      "discriminator": [
+        188,
+        233,
+        252,
+        106,
+        134,
+        146,
+        202,
+        91
+      ],
+      "accounts": [
+        {
+          "name": "protocol",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "treasury",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "register_borrowable",
+      "docs": [
+        "Register a borrowable asset (USDC, USDT, EURC)"
+      ],
+      "discriminator": [
+        238,
+        7,
+        245,
+        65,
+        218,
+        209,
+        198,
+        166
+      ],
+      "accounts": [
+        {
+          "name": "protocol",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "borrowable",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  111,
+                  114,
+                  114,
+                  111,
+                  119,
+                  97,
+                  98,
+                  108,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "mint"
+        },
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "protocol"
+          ]
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "oracle",
+          "type": "pubkey"
+        },
+        {
+          "name": "interest_rate_bps",
+          "type": "u16"
+        },
+        {
+          "name": "decimals",
+          "type": "u8"
+        },
+        {
+          "name": "asset_type",
+          "type": {
+            "defined": {
+              "name": "AssetType"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "register_collateral",
+      "docs": [
+        "Register a collateral asset (SOL, cbBTC, JitoSOL, etc.)"
+      ],
+      "discriminator": [
+        141,
+        208,
+        33,
+        233,
+        94,
+        168,
+        180,
+        178
+      ],
+      "accounts": [
+        {
+          "name": "protocol",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "collateral",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  108,
+                  108,
+                  97,
+                  116,
+                  101,
+                  114,
+                  97,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "mint"
+        },
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "protocol"
+          ]
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "oracle",
+          "type": "pubkey"
+        },
+        {
+          "name": "max_ltv_bps",
+          "type": "u16"
+        },
+        {
+          "name": "liquidation_threshold_bps",
+          "type": "u16"
+        },
+        {
+          "name": "liquidation_bonus_bps",
+          "type": "u16"
+        },
+        {
+          "name": "decimals",
+          "type": "u8"
+        },
+        {
+          "name": "asset_type",
+          "type": {
+            "defined": {
+              "name": "AssetType"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "set_paused",
+      "docs": [
+        "Pause/unpause protocol (admin only)"
+      ],
+      "discriminator": [
+        91,
+        60,
+        125,
+        192,
+        176,
+        225,
+        166,
+        218
+      ],
+      "accounts": [
+        {
+          "name": "protocol",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "admin",
+          "signer": true,
+          "relations": [
+            "protocol"
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "paused",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "sync_pyth_price",
+      "docs": [
+        "Sync price from Pyth oracle (permissionless)"
+      ],
+      "discriminator": [
+        22,
+        42,
+        132,
+        253,
+        139,
+        244,
+        219,
+        176
+      ],
+      "accounts": [
+        {
+          "name": "price_feed",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  105,
+                  99,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "mint"
+        },
+        {
+          "name": "pyth_price_account"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "update_price",
+      "docs": [
+        "Update price (admin only - for testing/fallback)"
+      ],
+      "discriminator": [
+        61,
+        34,
+        117,
+        155,
+        75,
+        34,
+        123,
+        208
+      ],
+      "accounts": [
+        {
+          "name": "protocol",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "price_feed",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  105,
+                  99,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "mint"
+        },
+        {
+          "name": "admin",
+          "signer": true,
+          "relations": [
+            "protocol"
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "price_usd",
+          "type": "u64"
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "Borrowable",
+      "discriminator": [
+        133,
+        45,
+        237,
+        66,
+        89,
+        207,
+        15,
+        91
+      ]
+    },
+    {
+      "name": "Collateral",
+      "discriminator": [
+        123,
+        130,
+        234,
+        63,
+        255,
+        240,
+        255,
+        92
+      ]
+    },
+    {
+      "name": "PriceFeed",
+      "discriminator": [
+        189,
+        103,
+        252,
+        23,
+        152,
+        35,
+        243,
+        156
+      ]
+    },
+    {
+      "name": "Protocol",
+      "discriminator": [
+        45,
+        39,
+        101,
+        43,
+        115,
+        72,
+        131,
+        40
+      ]
+    }
+  ],
+  "events": [
+    {
+      "name": "BorrowableRegistered",
+      "discriminator": [
+        22,
+        90,
+        10,
+        171,
+        74,
+        45,
+        106,
+        87
+      ]
+    },
+    {
+      "name": "Borrowed",
+      "discriminator": [
+        225,
+        182,
+        241,
+        78,
+        34,
+        145,
+        253,
+        230
+      ]
+    },
+    {
+      "name": "CollateralDeposited",
+      "discriminator": [
+        244,
+        62,
+        77,
+        11,
+        135,
+        112,
+        61,
+        96
+      ]
+    },
+    {
+      "name": "CollateralRegistered",
+      "discriminator": [
+        50,
+        84,
+        65,
+        7,
+        252,
+        156,
+        229,
+        187
+      ]
+    },
+    {
+      "name": "CollateralWithdrawn",
+      "discriminator": [
+        51,
+        224,
+        133,
+        106,
+        74,
+        173,
+        72,
+        82
+      ]
+    },
+    {
+      "name": "EModeSet",
+      "discriminator": [
+        212,
+        68,
+        66,
+        164,
+        193,
+        22,
+        217,
+        76
+      ]
+    },
+    {
+      "name": "FlashLoanInitiated",
+      "discriminator": [
+        86,
+        253,
+        153,
+        175,
+        98,
+        155,
+        112,
+        96
+      ]
+    },
+    {
+      "name": "FlashLoanRepaid",
+      "discriminator": [
+        9,
+        204,
+        105,
+        115,
+        70,
+        7,
+        25,
+        198
+      ]
+    },
+    {
+      "name": "GadExecuted",
+      "discriminator": [
+        84,
+        107,
+        67,
+        2,
+        2,
+        6,
+        166,
+        196
+      ]
+    },
+    {
+      "name": "LeverageClosed",
+      "discriminator": [
+        116,
+        223,
+        64,
+        32,
+        4,
+        240,
+        26,
+        30
+      ]
+    },
+    {
+      "name": "LeverageOpened",
+      "discriminator": [
+        207,
+        194,
+        47,
+        241,
+        248,
+        145,
+        222,
+        104
+      ]
+    },
+    {
+      "name": "LpDeposited",
+      "discriminator": [
+        85,
+        211,
+        184,
+        159,
+        176,
+        224,
+        28,
+        72
+      ]
+    },
+    {
+      "name": "LpWithdrawn",
+      "discriminator": [
+        188,
+        10,
+        43,
+        60,
+        223,
+        238,
+        51,
+        153
+      ]
+    },
+    {
+      "name": "MarketCreated",
+      "discriminator": [
+        88,
+        184,
+        130,
+        231,
+        226,
+        84,
+        6,
+        58
+      ]
+    },
+    {
+      "name": "MarketToggled",
+      "discriminator": [
+        39,
+        229,
+        230,
+        253,
+        143,
+        24,
+        217,
+        86
+      ]
+    },
+    {
+      "name": "MarketUpdated",
+      "discriminator": [
+        170,
+        51,
+        74,
+        147,
+        116,
+        168,
+        217,
+        251
+      ]
+    },
+    {
+      "name": "PositionCreated",
+      "discriminator": [
+        63,
+        226,
+        54,
+        63,
+        141,
+        22,
+        31,
+        221
+      ]
+    },
+    {
+      "name": "PriceUpdated",
+      "discriminator": [
+        154,
+        72,
+        87,
+        150,
+        246,
+        230,
+        23,
+        217
+      ]
+    },
+    {
+      "name": "ProtocolInitialized",
+      "discriminator": [
+        173,
+        122,
+        168,
+        254,
+        9,
+        118,
+        76,
+        132
+      ]
+    },
+    {
+      "name": "Repaid",
+      "discriminator": [
+        38,
+        248,
+        231,
+        7,
+        150,
+        164,
+        172,
+        23
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "InvalidAmount",
+      "msg": "Invalid amount"
+    },
+    {
+      "code": 6001,
+      "name": "MathOverflow",
+      "msg": "Math overflow"
+    },
+    {
+      "code": 6002,
+      "name": "ExceedsLTV",
+      "msg": "Exceeds maximum LTV"
+    },
+    {
+      "code": 6003,
+      "name": "InsufficientCollateral",
+      "msg": "Insufficient collateral"
+    },
+    {
+      "code": 6004,
+      "name": "InsufficientLiquidity",
+      "msg": "Insufficient liquidity in pool"
+    },
+    {
+      "code": 6005,
+      "name": "AssetNotSupported",
+      "msg": "Asset not supported"
+    },
+    {
+      "code": 6006,
+      "name": "AssetNotActive",
+      "msg": "Asset is not active"
+    },
+    {
+      "code": 6007,
+      "name": "PositionNotFound",
+      "msg": "Position not found"
+    },
+    {
+      "code": 6008,
+      "name": "GadDisabled",
+      "msg": "GAD is disabled for this position"
+    },
+    {
+      "code": 6009,
+      "name": "NoDebtToDeleverage",
+      "msg": "No debt to deleverage"
+    },
+    {
+      "code": 6010,
+      "name": "LtvBelowGadThreshold",
+      "msg": "LTV below GAD threshold"
+    },
+    {
+      "code": 6011,
+      "name": "CrankTooSoon",
+      "msg": "Crank called too soon"
+    },
+    {
+      "code": 6012,
+      "name": "NothingToLiquidate",
+      "msg": "Nothing to liquidate"
+    },
+    {
+      "code": 6013,
+      "name": "BelowCollateralFloor",
+      "msg": "Below minimum collateral floor"
+    },
+    {
+      "code": 6014,
+      "name": "InvalidGadConfig",
+      "msg": "Invalid GAD configuration"
+    },
+    {
+      "code": 6015,
+      "name": "NoLpShares",
+      "msg": "No LP shares in pool"
+    },
+    {
+      "code": 6016,
+      "name": "ProtocolPaused",
+      "msg": "Protocol is paused"
+    },
+    {
+      "code": 6017,
+      "name": "Unauthorized",
+      "msg": "Unauthorized"
+    },
+    {
+      "code": 6018,
+      "name": "StalePriceFeed",
+      "msg": "Price feed is stale"
+    },
+    {
+      "code": 6019,
+      "name": "FlashLoanNotRepaid",
+      "msg": "Flash loan not repaid"
+    },
+    {
+      "code": 6020,
+      "name": "InvalidOracle",
+      "msg": "Invalid oracle"
+    },
+    {
+      "code": 6021,
+      "name": "SlippageExceeded",
+      "msg": "Slippage exceeded"
+    },
+    {
+      "code": 6022,
+      "name": "MaxCollateralTypesReached",
+      "msg": "Max collateral types reached"
+    },
+    {
+      "code": 6023,
+      "name": "MaxBorrowTypesReached",
+      "msg": "Max borrow types reached"
+    },
+    {
+      "code": 6024,
+      "name": "InvalidSlot",
+      "msg": "Invalid slot provided"
+    }
+  ],
+  "types": [
+    {
+      "name": "AssetType",
+      "docs": [
+        "Supported asset types",
+        "Collaterals: SOL, cbBTC",
+        "Borrowables: USDC, EURC"
+      ],
+      "repr": {
+        "kind": "rust"
+      },
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "SOL"
+          },
+          {
+            "name": "CbBTC"
+          },
+          {
+            "name": "USDC"
+          },
+          {
+            "name": "EURC"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Borrowable",
+      "docs": [
+        "Borrowable asset configuration"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "oracle",
+            "type": "pubkey"
+          },
+          {
+            "name": "interest_rate_bps",
+            "type": "u16"
+          },
+          {
+            "name": "decimals",
+            "type": "u8"
+          },
+          {
+            "name": "is_active",
+            "type": "bool"
+          },
+          {
+            "name": "total_borrowed",
+            "type": "u64"
+          },
+          {
+            "name": "total_available",
+            "type": "u64"
+          },
+          {
+            "name": "asset_type",
+            "type": {
+              "defined": {
+                "name": "AssetType"
+              }
+            }
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "BorrowableRegistered",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "asset_type",
+            "type": {
+              "defined": {
+                "name": "AssetType"
+              }
+            }
+          },
+          {
+            "name": "interest_rate_bps",
+            "type": "u16"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Borrowed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "position",
+            "type": "pubkey"
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "asset_type",
+            "type": {
+              "defined": {
+                "name": "AssetType"
+              }
+            }
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "new_ltv_bps",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Collateral",
+      "docs": [
+        "Collateral asset configuration"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "oracle",
+            "type": "pubkey"
+          },
+          {
+            "name": "max_ltv_bps",
+            "type": "u16"
+          },
+          {
+            "name": "liquidation_threshold_bps",
+            "type": "u16"
+          },
+          {
+            "name": "liquidation_bonus_bps",
+            "type": "u16"
+          },
+          {
+            "name": "decimals",
+            "type": "u8"
+          },
+          {
+            "name": "is_active",
+            "type": "bool"
+          },
+          {
+            "name": "total_deposited",
+            "type": "u64"
+          },
+          {
+            "name": "asset_type",
+            "type": {
+              "defined": {
+                "name": "AssetType"
+              }
+            }
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CollateralDeposited",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "position",
+            "type": "pubkey"
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "asset_type",
+            "type": {
+              "defined": {
+                "name": "AssetType"
+              }
+            }
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "total_collateral_usd",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CollateralRegistered",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "asset_type",
+            "type": {
+              "defined": {
+                "name": "AssetType"
+              }
+            }
+          },
+          {
+            "name": "max_ltv_bps",
+            "type": "u16"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CollateralWithdrawn",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "position",
+            "type": "pubkey"
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "asset_type",
+            "type": {
+              "defined": {
+                "name": "AssetType"
+              }
+            }
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "EModeSet",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "position",
+            "type": "pubkey"
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "old_category",
+            "type": "u8"
+          },
+          {
+            "name": "new_category",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "FlashLoanInitiated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "borrower",
+            "type": "pubkey"
+          },
+          {
+            "name": "asset_type",
+            "type": {
+              "defined": {
+                "name": "AssetType"
+              }
+            }
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "fee",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "FlashLoanRepaid",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "borrower",
+            "type": "pubkey"
+          },
+          {
+            "name": "asset_type",
+            "type": {
+              "defined": {
+                "name": "AssetType"
+              }
+            }
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "fee",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "GadExecuted",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "position",
+            "type": "pubkey"
+          },
+          {
+            "name": "collateral_liquidated_usd",
+            "type": "u64"
+          },
+          {
+            "name": "debt_reduced_usd",
+            "type": "u64"
+          },
+          {
+            "name": "ltv_before_bps",
+            "type": "u64"
+          },
+          {
+            "name": "ltv_after_bps",
+            "type": "u64"
+          },
+          {
+            "name": "gad_rate_bps",
+            "type": "u64"
+          },
+          {
+            "name": "cranker",
+            "type": "pubkey"
+          },
+          {
+            "name": "cranker_reward",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "LeverageClosed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "position",
+            "type": "pubkey"
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "collateral_returned",
+            "type": "u64"
+          },
+          {
+            "name": "pnl_usd",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "LeverageOpened",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "position",
+            "type": "pubkey"
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "collateral_type",
+            "type": {
+              "defined": {
+                "name": "AssetType"
+              }
+            }
+          },
+          {
+            "name": "borrow_type",
+            "type": {
+              "defined": {
+                "name": "AssetType"
+              }
+            }
+          },
+          {
+            "name": "initial_collateral",
+            "type": "u64"
+          },
+          {
+            "name": "total_collateral",
+            "type": "u64"
+          },
+          {
+            "name": "total_borrowed",
+            "type": "u64"
+          },
+          {
+            "name": "leverage_multiplier",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "LpDeposited",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "depositor",
+            "type": "pubkey"
+          },
+          {
+            "name": "pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "shares_minted",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "LpWithdrawn",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "withdrawer",
+            "type": "pubkey"
+          },
+          {
+            "name": "pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "shares_burned",
+            "type": "u64"
+          },
+          {
+            "name": "amount_received",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MarketCreated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "market_id",
+            "type": "u16"
+          },
+          {
+            "name": "name",
+            "type": "string"
+          },
+          {
+            "name": "collateral_asset",
+            "type": {
+              "defined": {
+                "name": "AssetType"
+              }
+            }
+          },
+          {
+            "name": "borrow_asset",
+            "type": {
+              "defined": {
+                "name": "AssetType"
+              }
+            }
+          },
+          {
+            "name": "base_max_ltv_bps",
+            "type": "u16"
+          },
+          {
+            "name": "emode_max_ltv_bps",
+            "type": "u16"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MarketToggled",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "market_id",
+            "type": "u16"
+          },
+          {
+            "name": "is_active",
+            "type": "bool"
+          },
+          {
+            "name": "borrow_enabled",
+            "type": "bool"
+          },
+          {
+            "name": "collateral_enabled",
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MarketUpdated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "market_id",
+            "type": "u16"
+          },
+          {
+            "name": "base_max_ltv_bps",
+            "type": "u16"
+          },
+          {
+            "name": "emode_max_ltv_bps",
+            "type": "u16"
+          },
+          {
+            "name": "supply_cap",
+            "type": "u64"
+          },
+          {
+            "name": "borrow_cap",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PositionCreated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "position",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PriceFeed",
+      "docs": [
+        "Price feed (temporary - will use Pyth/Chainlink in prod)"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "asset_type",
+            "type": {
+              "defined": {
+                "name": "AssetType"
+              }
+            }
+          },
+          {
+            "name": "price_usd_6dec",
+            "type": "u64"
+          },
+          {
+            "name": "last_update",
+            "type": "i64"
+          },
+          {
+            "name": "confidence",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PriceUpdated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "asset_type",
+            "type": {
+              "defined": {
+                "name": "AssetType"
+              }
+            }
+          },
+          {
+            "name": "price_usd_6dec",
+            "type": "u64"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Protocol",
+      "docs": [
+        "Protocol global state"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "treasury",
+            "type": "pubkey"
+          },
+          {
+            "name": "insurance_fund",
+            "type": "u64"
+          },
+          {
+            "name": "total_collateral_usd",
+            "type": "u64"
+          },
+          {
+            "name": "total_borrowed_usd",
+            "type": "u64"
+          },
+          {
+            "name": "paused",
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ProtocolInitialized",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "treasury",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Repaid",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "position",
+            "type": "pubkey"
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "asset_type",
+            "type": {
+              "defined": {
+                "name": "AssetType"
+              }
+            }
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "interest_paid",
+            "type": "u64"
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,632 @@
+{
+  "address": "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4",
+  "metadata": {
+    "name": "legasi_gad",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Legasi GAD - Gradual Auto-Deleveraging mechanism"
+  },
+  "instructions": [
+    {
+      "name": "configure_gad",
+      "docs": [
+        "Configure GAD settings for a position"
+      ],
+      "discriminator": [
+        109,
+        167,
+        27,
+        17,
+        21,
+        131,
+        255,
+        181
+      ],
+      "accounts": [
+        {
+          "name": "position",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  115,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              }
+            ]
+          }
+        },
+        {
+          "name": "owner",
+          "signer": true,
+          "relations": [
+            "position"
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "enabled",
+          "type": "bool"
+        },
+        {
+          "name": "_custom_threshold_bps",
+          "type": {
+            "option": "u16"
+          }
+        }
+      ]
+    },
+    {
+      "name": "crank_gad",
+      "docs": [
+        "Crank GAD for a position - anyone can call"
+      ],
+      "discriminator": [
+        196,
+        117,
+        173,
+        195,
+        142,
+        102,
+        114,
+        49
+      ],
+      "accounts": [
+        {
+          "name": "position",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  115,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "position.owner",
+                "account": "Position"
+              }
+            ]
+          }
+        },
+        {
+          "name": "protocol",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "sol_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  111,
+                  108,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "position"
+              }
+            ]
+          }
+        },
+        {
+          "name": "treasury",
+          "writable": true,
+          "relations": [
+            "protocol"
+          ]
+        },
+        {
+          "name": "sol_price_feed"
+        },
+        {
+          "name": "cranker",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "crank_gad_with_swap",
+      "docs": [
+        "Execute GAD with Jupiter swap - converts liquidated collateral to USDC",
+        "This is the production version that actually swaps via Jupiter"
+      ],
+      "discriminator": [
+        74,
+        126,
+        104,
+        197,
+        131,
+        3,
+        17,
+        40
+      ],
+      "accounts": [
+        {
+          "name": "position",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  115,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "position.owner",
+                "account": "Position"
+              }
+            ]
+          }
+        },
+        {
+          "name": "protocol",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "sol_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  111,
+                  108,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "position"
+              }
+            ]
+          }
+        },
+        {
+          "name": "usdc_vault",
+          "docs": [
+            "USDC vault to receive swap output"
+          ],
+          "writable": true
+        },
+        {
+          "name": "jupiter_program",
+          "address": "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4"
+        },
+        {
+          "name": "cranker",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "jupiter_swap_data",
+          "type": "bytes"
+        },
+        {
+          "name": "min_out_amount",
+          "type": "u64"
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "Position",
+      "discriminator": [
+        170,
+        188,
+        143,
+        228,
+        122,
+        64,
+        247,
+        208
+      ]
+    },
+    {
+      "name": "PriceFeed",
+      "discriminator": [
+        189,
+        103,
+        252,
+        23,
+        152,
+        35,
+        243,
+        156
+      ]
+    },
+    {
+      "name": "Protocol",
+      "discriminator": [
+        45,
+        39,
+        101,
+        43,
+        115,
+        72,
+        131,
+        40
+      ]
+    }
+  ],
+  "events": [
+    {
+      "name": "GadSwapExecuted",
+      "discriminator": [
+        127,
+        64,
+        178,
+        249,
+        174,
+        17,
+        71,
+        115
+      ]
+    }
+  ],
+  "types": [
+    {
+      "name": "AssetType",
+      "docs": [
+        "Supported asset types",
+        "Collaterals: SOL, cbBTC",
+        "Borrowables: USDC, EURC"
+      ],
+      "repr": {
+        "kind": "rust"
+      },
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "SOL"
+          },
+          {
+            "name": "CbBTC"
+          },
+          {
+            "name": "USDC"
+          },
+          {
+            "name": "EURC"
+          }
+        ]
+      }
+    },
+    {
+      "name": "BorrowedAmount",
+      "docs": [
+        "Single borrow entry"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "asset_type",
+            "type": {
+              "defined": {
+                "name": "AssetType"
+              }
+            }
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "accrued_interest",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CollateralDeposit",
+      "docs": [
+        "Single collateral deposit entry"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "asset_type",
+            "type": {
+              "defined": {
+                "name": "AssetType"
+              }
+            }
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "GadSwapExecuted",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "position",
+            "type": "pubkey"
+          },
+          {
+            "name": "sol_liquidated",
+            "type": "u64"
+          },
+          {
+            "name": "usdc_received",
+            "type": "u64"
+          },
+          {
+            "name": "cranker",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Position",
+      "docs": [
+        "User lending position (multi-collateral, multi-borrow)"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "collaterals",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "CollateralDeposit"
+                }
+              }
+            }
+          },
+          {
+            "name": "borrows",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "BorrowedAmount"
+                }
+              }
+            }
+          },
+          {
+            "name": "last_update",
+            "type": "i64"
+          },
+          {
+            "name": "last_gad_crank",
+            "type": "i64"
+          },
+          {
+            "name": "gad_enabled",
+            "type": "bool"
+          },
+          {
+            "name": "total_gad_liquidated_usd",
+            "type": "u64"
+          },
+          {
+            "name": "reputation",
+            "type": {
+              "defined": {
+                "name": "Reputation"
+              }
+            }
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PriceFeed",
+      "docs": [
+        "Price feed (temporary - will use Pyth/Chainlink in prod)"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "asset_type",
+            "type": {
+              "defined": {
+                "name": "AssetType"
+              }
+            }
+          },
+          {
+            "name": "price_usd_6dec",
+            "type": "u64"
+          },
+          {
+            "name": "last_update",
+            "type": "i64"
+          },
+          {
+            "name": "confidence",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Protocol",
+      "docs": [
+        "Protocol global state"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "treasury",
+            "type": "pubkey"
+          },
+          {
+            "name": "insurance_fund",
+            "type": "u64"
+          },
+          {
+            "name": "total_collateral_usd",
+            "type": "u64"
+          },
+          {
+            "name": "total_borrowed_usd",
+            "type": "u64"
+          },
+          {
+            "name": "paused",
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Reputation",
+      "docs": [
+        "On-chain reputation score"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "successful_repayments",
+            "type": "u32"
+          },
+          {
+            "name": "total_repaid_usd",
+            "type": "u64"
+          },
+          {
+            "name": "gad_events",
+            "type": "u32"
+          },
+          {
+            "name": "account_age_days",
+            "type": "u32"
+          }
+        ]
+      }
+    }
+  ]
+}

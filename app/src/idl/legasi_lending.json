@@ -1,0 +1,2337 @@
+{
+  "address": "DGRYqD9Hg9v27Fa9kLUUf3KY9hoprjBQp7y88qG9q88u",
+  "metadata": {
+    "name": "legasi_lending",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Legasi Lending - Multi-collateral deposit, borrow, repay, withdraw"
+  },
+  "instructions": [
+    {
+      "name": "accrue_position_interest",
+      "docs": [
+        "Accrue interest on a position's borrows",
+        "Can be called by anyone (cranker) to update interest"
+      ],
+      "discriminator": [
+        90,
+        67,
+        42,
+        149,
+        205,
+        62,
+        160,
+        233
+      ],
+      "accounts": [
+        {
+          "name": "position",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  115,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "position.owner",
+                "account": "Position"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "agent_auto_repay",
+      "docs": [
+        "Agent auto-repay - automatically repay debt when USDC is received"
+      ],
+      "discriminator": [
+        17,
+        151,
+        220,
+        152,
+        21,
+        189,
+        94,
+        23
+      ],
+      "accounts": [
+        {
+          "name": "position",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  115,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "position.owner",
+                "account": "Position"
+              }
+            ]
+          }
+        },
+        {
+          "name": "agent_config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  103,
+                  101,
+                  110,
+                  116,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "position"
+              }
+            ]
+          }
+        },
+        {
+          "name": "lp_pool",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  112,
+                  95,
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "lp_pool.borrowable_mint",
+                "account": "LpPool"
+              }
+            ]
+          }
+        },
+        {
+          "name": "borrow_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  112,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "lp_pool.borrowable_mint",
+                "account": "LpPool"
+              }
+            ]
+          }
+        },
+        {
+          "name": "agent_token_account",
+          "writable": true
+        },
+        {
+          "name": "agent",
+          "docs": [
+            "The agent executing auto-repay"
+          ],
+          "signer": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "agent_borrow",
+      "docs": [
+        "Agent borrow - respects daily limits",
+        "Can be called by the agent (position owner) autonomously"
+      ],
+      "discriminator": [
+        116,
+        148,
+        14,
+        193,
+        154,
+        70,
+        246,
+        136
+      ],
+      "accounts": [
+        {
+          "name": "position",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  115,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "position.owner",
+                "account": "Position"
+              }
+            ]
+          }
+        },
+        {
+          "name": "agent_config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  103,
+                  101,
+                  110,
+                  116,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "position"
+              }
+            ]
+          }
+        },
+        {
+          "name": "lp_pool",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  112,
+                  95,
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "lp_pool.borrowable_mint",
+                "account": "LpPool"
+              }
+            ]
+          }
+        },
+        {
+          "name": "borrow_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  112,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "lp_pool.borrowable_mint",
+                "account": "LpPool"
+              }
+            ]
+          }
+        },
+        {
+          "name": "agent_token_account",
+          "writable": true
+        },
+        {
+          "name": "sol_price_feed"
+        },
+        {
+          "name": "agent",
+          "docs": [
+            "The agent (position owner) executing the borrow"
+          ],
+          "signer": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "borrow",
+      "docs": [
+        "Borrow stablecoins (USDC, EURC)"
+      ],
+      "discriminator": [
+        228,
+        253,
+        131,
+        202,
+        207,
+        116,
+        89,
+        18
+      ],
+      "accounts": [
+        {
+          "name": "position",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  115,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              }
+            ]
+          }
+        },
+        {
+          "name": "protocol",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "borrowable_config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  111,
+                  114,
+                  114,
+                  111,
+                  119,
+                  97,
+                  98,
+                  108,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "borrowable_config.mint",
+                "account": "Borrowable"
+              }
+            ]
+          }
+        },
+        {
+          "name": "borrow_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  111,
+                  114,
+                  114,
+                  111,
+                  119,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "borrowable_config.mint",
+                "account": "Borrowable"
+              }
+            ]
+          }
+        },
+        {
+          "name": "user_token_account",
+          "writable": true
+        },
+        {
+          "name": "sol_price_feed",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  105,
+                  99,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "sol_mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "sol_mint"
+        },
+        {
+          "name": "owner",
+          "signer": true,
+          "relations": [
+            "position"
+          ]
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "configure_agent",
+      "docs": [
+        "Configure agent settings for a position",
+        "Only the position owner can call this"
+      ],
+      "discriminator": [
+        185,
+        111,
+        49,
+        42,
+        77,
+        47,
+        113,
+        107
+      ],
+      "accounts": [
+        {
+          "name": "position",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  115,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              }
+            ]
+          }
+        },
+        {
+          "name": "agent_config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  103,
+                  101,
+                  110,
+                  116,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "position"
+              }
+            ]
+          }
+        },
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "position"
+          ]
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "daily_borrow_limit",
+          "type": "u64"
+        },
+        {
+          "name": "auto_repay_enabled",
+          "type": "bool"
+        },
+        {
+          "name": "x402_enabled",
+          "type": "bool"
+        },
+        {
+          "name": "alert_threshold_bps",
+          "type": "u16"
+        }
+      ]
+    },
+    {
+      "name": "deposit_sol",
+      "docs": [
+        "Deposit SOL as collateral"
+      ],
+      "discriminator": [
+        108,
+        81,
+        78,
+        117,
+        125,
+        155,
+        56,
+        200
+      ],
+      "accounts": [
+        {
+          "name": "position",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  115,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              }
+            ]
+          }
+        },
+        {
+          "name": "sol_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  111,
+                  108,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "position"
+              }
+            ]
+          }
+        },
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "position"
+          ]
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "deposit_token",
+      "docs": [
+        "Deposit SPL token as collateral (cbBTC)"
+      ],
+      "discriminator": [
+        11,
+        156,
+        96,
+        218,
+        39,
+        163,
+        180,
+        19
+      ],
+      "accounts": [
+        {
+          "name": "position",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  115,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              }
+            ]
+          }
+        },
+        {
+          "name": "collateral_config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  108,
+                  108,
+                  97,
+                  116,
+                  101,
+                  114,
+                  97,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "collateral_config.mint",
+                "account": "Collateral"
+              }
+            ]
+          }
+        },
+        {
+          "name": "user_token_account",
+          "writable": true
+        },
+        {
+          "name": "token_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  111,
+                  107,
+                  101,
+                  110,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "collateral_config.mint",
+                "account": "Collateral"
+              }
+            ]
+          }
+        },
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "position"
+          ]
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "initialize_position",
+      "docs": [
+        "Initialize a user position"
+      ],
+      "discriminator": [
+        219,
+        192,
+        234,
+        71,
+        190,
+        191,
+        102,
+        80
+      ],
+      "accounts": [
+        {
+          "name": "position",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  115,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              }
+            ]
+          }
+        },
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "offramp_via_bridge",
+      "docs": [
+        "Off-ramp borrowed stablecoins via Bridge.xyz",
+        "Burns the borrowed tokens and initiates fiat transfer"
+      ],
+      "discriminator": [
+        101,
+        170,
+        23,
+        72,
+        218,
+        171,
+        150,
+        232
+      ],
+      "accounts": [
+        {
+          "name": "position",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  115,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              }
+            ]
+          }
+        },
+        {
+          "name": "offramp_request",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  102,
+                  102,
+                  114,
+                  97,
+                  109,
+                  112
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              },
+              {
+                "kind": "arg",
+                "path": "request_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "stablecoin_mint",
+          "writable": true
+        },
+        {
+          "name": "user_token_account",
+          "writable": true
+        },
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "position"
+          ]
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "request_id",
+          "type": "u64"
+        },
+        {
+          "name": "amount",
+          "type": "u64"
+        },
+        {
+          "name": "destination_iban",
+          "type": "string"
+        },
+        {
+          "name": "destination_name",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "repay",
+      "docs": [
+        "Repay borrowed amount"
+      ],
+      "discriminator": [
+        234,
+        103,
+        67,
+        82,
+        208,
+        234,
+        219,
+        166
+      ],
+      "accounts": [
+        {
+          "name": "position",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  115,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              }
+            ]
+          }
+        },
+        {
+          "name": "borrowable_config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  111,
+                  114,
+                  114,
+                  111,
+                  119,
+                  97,
+                  98,
+                  108,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "borrowable_config.mint",
+                "account": "Borrowable"
+              }
+            ]
+          }
+        },
+        {
+          "name": "borrow_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  111,
+                  114,
+                  114,
+                  111,
+                  119,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "borrowable_config.mint",
+                "account": "Borrowable"
+              }
+            ]
+          }
+        },
+        {
+          "name": "user_token_account",
+          "writable": true
+        },
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "position"
+          ]
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "withdraw_sol",
+      "docs": [
+        "Withdraw SOL collateral"
+      ],
+      "discriminator": [
+        145,
+        131,
+        74,
+        136,
+        65,
+        137,
+        42,
+        38
+      ],
+      "accounts": [
+        {
+          "name": "position",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  115,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              }
+            ]
+          }
+        },
+        {
+          "name": "sol_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  111,
+                  108,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "position"
+              }
+            ]
+          }
+        },
+        {
+          "name": "sol_price_feed",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  105,
+                  99,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "sol_mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "sol_mint"
+        },
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "position"
+          ]
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "x402_pay",
+      "docs": [
+        "Process an x402 payment request",
+        "Agent pays for a service, borrowing if needed"
+      ],
+      "discriminator": [
+        7,
+        105,
+        114,
+        162,
+        141,
+        186,
+        58,
+        215
+      ],
+      "accounts": [
+        {
+          "name": "position",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  115,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "position.owner",
+                "account": "Position"
+              }
+            ]
+          }
+        },
+        {
+          "name": "agent_config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  103,
+                  101,
+                  110,
+                  116,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "position"
+              }
+            ]
+          }
+        },
+        {
+          "name": "lp_pool",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  112,
+                  95,
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "lp_pool.borrowable_mint",
+                "account": "LpPool"
+              }
+            ]
+          }
+        },
+        {
+          "name": "borrow_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  112,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "lp_pool.borrowable_mint",
+                "account": "LpPool"
+              }
+            ]
+          }
+        },
+        {
+          "name": "agent_token_account",
+          "writable": true
+        },
+        {
+          "name": "recipient_token_account",
+          "writable": true
+        },
+        {
+          "name": "receipt",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  120,
+                  52,
+                  48,
+                  50,
+                  95,
+                  114,
+                  101,
+                  99,
+                  101,
+                  105,
+                  112,
+                  116
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "payment_request.payment_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "agent",
+          "docs": [
+            "The agent making the payment"
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "payment_request",
+          "type": {
+            "defined": {
+              "name": "X402PaymentRequest"
+            }
+          }
+        },
+        {
+          "name": "auto_borrow",
+          "type": "bool"
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "AgentConfig",
+      "discriminator": [
+        253,
+        238,
+        178,
+        11,
+        45,
+        187,
+        48,
+        224
+      ]
+    },
+    {
+      "name": "Borrowable",
+      "discriminator": [
+        133,
+        45,
+        237,
+        66,
+        89,
+        207,
+        15,
+        91
+      ]
+    },
+    {
+      "name": "Collateral",
+      "discriminator": [
+        123,
+        130,
+        234,
+        63,
+        255,
+        240,
+        255,
+        92
+      ]
+    },
+    {
+      "name": "LpPool",
+      "discriminator": [
+        185,
+        127,
+        131,
+        141,
+        197,
+        198,
+        170,
+        147
+      ]
+    },
+    {
+      "name": "OfframpRequest",
+      "discriminator": [
+        50,
+        158,
+        142,
+        232,
+        238,
+        112,
+        158,
+        163
+      ]
+    },
+    {
+      "name": "Position",
+      "discriminator": [
+        170,
+        188,
+        143,
+        228,
+        122,
+        64,
+        247,
+        208
+      ]
+    },
+    {
+      "name": "PriceFeed",
+      "discriminator": [
+        189,
+        103,
+        252,
+        23,
+        152,
+        35,
+        243,
+        156
+      ]
+    },
+    {
+      "name": "Protocol",
+      "discriminator": [
+        45,
+        39,
+        101,
+        43,
+        115,
+        72,
+        131,
+        40
+      ]
+    },
+    {
+      "name": "X402Receipt",
+      "discriminator": [
+        71,
+        134,
+        30,
+        217,
+        93,
+        174,
+        144,
+        205
+      ]
+    }
+  ],
+  "events": [
+    {
+      "name": "AgentBorrowed",
+      "discriminator": [
+        178,
+        96,
+        140,
+        27,
+        200,
+        248,
+        150,
+        72
+      ]
+    },
+    {
+      "name": "OfframpRequested",
+      "discriminator": [
+        140,
+        201,
+        235,
+        133,
+        100,
+        220,
+        80,
+        84
+      ]
+    },
+    {
+      "name": "X402PaymentMade",
+      "discriminator": [
+        191,
+        163,
+        148,
+        235,
+        38,
+        55,
+        240,
+        57
+      ]
+    }
+  ],
+  "types": [
+    {
+      "name": "AgentBorrowed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "position",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "daily_remaining",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "AgentConfig",
+      "docs": [
+        "Agent-specific position for x402 and autonomous operations",
+        "Extends the base Position with agent-specific features"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "position",
+            "docs": [
+              "The position this config extends"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "operator",
+            "docs": [
+              "Human operator (can intervene if needed)"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "daily_borrow_limit",
+            "docs": [
+              "Maximum USDC that can be borrowed per day"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "daily_borrowed",
+            "docs": [
+              "Amount borrowed in current period"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "period_start",
+            "docs": [
+              "Period reset timestamp"
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "auto_repay_enabled",
+            "docs": [
+              "Auto-repay incoming USDC to reduce debt"
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "x402_enabled",
+            "docs": [
+              "x402 payment endpoint enabled"
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "alerts_enabled",
+            "docs": [
+              "Webhook URL for low balance alerts (stored off-chain, this is just a flag)"
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "alert_threshold_bps",
+            "docs": [
+              "Minimum collateral ratio before alert (in bps)"
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "AssetType",
+      "docs": [
+        "Supported asset types",
+        "Collaterals: SOL, cbBTC",
+        "Borrowables: USDC, EURC"
+      ],
+      "repr": {
+        "kind": "rust"
+      },
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "SOL"
+          },
+          {
+            "name": "CbBTC"
+          },
+          {
+            "name": "USDC"
+          },
+          {
+            "name": "EURC"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Borrowable",
+      "docs": [
+        "Borrowable asset configuration"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "oracle",
+            "type": "pubkey"
+          },
+          {
+            "name": "interest_rate_bps",
+            "type": "u16"
+          },
+          {
+            "name": "decimals",
+            "type": "u8"
+          },
+          {
+            "name": "is_active",
+            "type": "bool"
+          },
+          {
+            "name": "total_borrowed",
+            "type": "u64"
+          },
+          {
+            "name": "total_available",
+            "type": "u64"
+          },
+          {
+            "name": "asset_type",
+            "type": {
+              "defined": {
+                "name": "AssetType"
+              }
+            }
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "BorrowedAmount",
+      "docs": [
+        "Single borrow entry"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "asset_type",
+            "type": {
+              "defined": {
+                "name": "AssetType"
+              }
+            }
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "accrued_interest",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Collateral",
+      "docs": [
+        "Collateral asset configuration"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "oracle",
+            "type": "pubkey"
+          },
+          {
+            "name": "max_ltv_bps",
+            "type": "u16"
+          },
+          {
+            "name": "liquidation_threshold_bps",
+            "type": "u16"
+          },
+          {
+            "name": "liquidation_bonus_bps",
+            "type": "u16"
+          },
+          {
+            "name": "decimals",
+            "type": "u8"
+          },
+          {
+            "name": "is_active",
+            "type": "bool"
+          },
+          {
+            "name": "total_deposited",
+            "type": "u64"
+          },
+          {
+            "name": "asset_type",
+            "type": {
+              "defined": {
+                "name": "AssetType"
+              }
+            }
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CollateralDeposit",
+      "docs": [
+        "Single collateral deposit entry"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "asset_type",
+            "type": {
+              "defined": {
+                "name": "AssetType"
+              }
+            }
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "LpPool",
+      "docs": [
+        "LP pool for a borrowable asset"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "borrowable_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "lp_token_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "total_deposits",
+            "type": "u64"
+          },
+          {
+            "name": "total_shares",
+            "type": "u64"
+          },
+          {
+            "name": "total_borrowed",
+            "type": "u64"
+          },
+          {
+            "name": "interest_earned",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "OfframpRequest",
+      "docs": [
+        "Off-ramp request account"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "destination_iban",
+            "type": "string"
+          },
+          {
+            "name": "destination_name",
+            "type": "string"
+          },
+          {
+            "name": "status",
+            "type": {
+              "defined": {
+                "name": "OfframpStatus"
+              }
+            }
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          },
+          {
+            "name": "completed_at",
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "OfframpRequested",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "destination_iban",
+            "type": "string"
+          },
+          {
+            "name": "asset_type",
+            "type": {
+              "defined": {
+                "name": "AssetType"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "OfframpStatus",
+      "docs": [
+        "Off-ramp request status"
+      ],
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Pending"
+          },
+          {
+            "name": "Processing"
+          },
+          {
+            "name": "Completed"
+          },
+          {
+            "name": "Failed"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Position",
+      "docs": [
+        "User lending position (multi-collateral, multi-borrow)"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "collaterals",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "CollateralDeposit"
+                }
+              }
+            }
+          },
+          {
+            "name": "borrows",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "BorrowedAmount"
+                }
+              }
+            }
+          },
+          {
+            "name": "last_update",
+            "type": "i64"
+          },
+          {
+            "name": "last_gad_crank",
+            "type": "i64"
+          },
+          {
+            "name": "gad_enabled",
+            "type": "bool"
+          },
+          {
+            "name": "total_gad_liquidated_usd",
+            "type": "u64"
+          },
+          {
+            "name": "reputation",
+            "type": {
+              "defined": {
+                "name": "Reputation"
+              }
+            }
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PriceFeed",
+      "docs": [
+        "Price feed (temporary - will use Pyth/Chainlink in prod)"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "asset_type",
+            "type": {
+              "defined": {
+                "name": "AssetType"
+              }
+            }
+          },
+          {
+            "name": "price_usd_6dec",
+            "type": "u64"
+          },
+          {
+            "name": "last_update",
+            "type": "i64"
+          },
+          {
+            "name": "confidence",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Protocol",
+      "docs": [
+        "Protocol global state"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "treasury",
+            "type": "pubkey"
+          },
+          {
+            "name": "insurance_fund",
+            "type": "u64"
+          },
+          {
+            "name": "total_collateral_usd",
+            "type": "u64"
+          },
+          {
+            "name": "total_borrowed_usd",
+            "type": "u64"
+          },
+          {
+            "name": "paused",
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Reputation",
+      "docs": [
+        "On-chain reputation score"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "successful_repayments",
+            "type": "u32"
+          },
+          {
+            "name": "total_repaid_usd",
+            "type": "u64"
+          },
+          {
+            "name": "gad_events",
+            "type": "u32"
+          },
+          {
+            "name": "account_age_days",
+            "type": "u32"
+          }
+        ]
+      }
+    },
+    {
+      "name": "X402PaymentMade",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "payer",
+            "type": "pubkey"
+          },
+          {
+            "name": "recipient",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "payment_id",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "borrowed",
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "X402PaymentRequest",
+      "docs": [
+        "x402 Payment Protocol Integration",
+        "",
+        "x402 is HTTP 402 \"Payment Required\" - a protocol for machine-to-machine payments.",
+        "When an agent receives a 402 response, it needs to pay to access the service.",
+        "",
+        "Flow:",
+        "1. Agent calls API → receives 402 with payment details",
+        "2. Agent calls x402_pay with the payment request",
+        "3. Legasi verifies, borrows if needed, and sends payment",
+        "4. Agent retries API call with payment proof",
+        "x402 payment request (parsed from 402 response)"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "recipient",
+            "docs": [
+              "Recipient of the payment"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "docs": [
+              "Amount in smallest unit (e.g., USDC with 6 decimals)"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "asset",
+            "docs": [
+              "Asset type (USDC or EURC)"
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "payment_id",
+            "docs": [
+              "Unique payment ID to prevent replay"
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "expires_at",
+            "docs": [
+              "Expiry timestamp"
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "callback_url_hash",
+            "docs": [
+              "Optional: service endpoint for callback"
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "X402Receipt",
+      "docs": [
+        "x402 payment receipt (proof of payment)"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "payment_id",
+            "docs": [
+              "The payment request this fulfills"
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "payer",
+            "docs": [
+              "Who paid"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "recipient",
+            "docs": [
+              "Who received"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "docs": [
+              "Amount paid"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "paid_at",
+            "docs": [
+              "When paid"
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "tx_signature",
+            "docs": [
+              "Transaction signature (for verification)"
+            ],
+            "type": {
+              "array": [
+                "u8",
+                64
+              ]
+            }
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    }
+  ]
+}

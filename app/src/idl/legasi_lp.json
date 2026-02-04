@@ -1,0 +1,645 @@
+{
+  "address": "4g7FgDLuxXJ7fRa57m8SV3gjznMZ9KUjcdJfg1b6BfPF",
+  "metadata": {
+    "name": "legasi_lp",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Legasi LP - Liquidity provider vault and yield tokens"
+  },
+  "instructions": [
+    {
+      "name": "accrue_interest",
+      "docs": [
+        "Accrue interest to the pool (called by lending program)"
+      ],
+      "discriminator": [
+        47,
+        40,
+        115,
+        198,
+        91,
+        12,
+        222,
+        49
+      ],
+      "accounts": [
+        {
+          "name": "lp_pool",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  112,
+                  95,
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "lp_pool.borrowable_mint",
+                "account": "LpPool"
+              }
+            ]
+          }
+        },
+        {
+          "name": "protocol",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "lending_authority",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "interest_amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "deposit",
+      "docs": [
+        "Deposit stablecoins, receive LP tokens (e.g., deposit USDC, get bUSDC)"
+      ],
+      "discriminator": [
+        242,
+        35,
+        198,
+        137,
+        82,
+        225,
+        242,
+        182
+      ],
+      "accounts": [
+        {
+          "name": "lp_pool",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  112,
+                  95,
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "lp_pool.borrowable_mint",
+                "account": "LpPool"
+              }
+            ]
+          }
+        },
+        {
+          "name": "lp_token_mint",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  112,
+                  95,
+                  116,
+                  111,
+                  107,
+                  101,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "lp_pool.borrowable_mint",
+                "account": "LpPool"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  112,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "lp_pool.borrowable_mint",
+                "account": "LpPool"
+              }
+            ]
+          }
+        },
+        {
+          "name": "user_token_account",
+          "writable": true
+        },
+        {
+          "name": "user_lp_token_account",
+          "writable": true
+        },
+        {
+          "name": "depositor",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "get_exchange_rate",
+      "docs": [
+        "Get current exchange rate (tokens per LP share)"
+      ],
+      "discriminator": [
+        153,
+        76,
+        17,
+        194,
+        170,
+        215,
+        89,
+        142
+      ],
+      "accounts": [
+        {
+          "name": "lp_pool",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  112,
+                  95,
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "lp_pool.borrowable_mint",
+                "account": "LpPool"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [],
+      "returns": "u64"
+    },
+    {
+      "name": "initialize_pool",
+      "docs": [
+        "Initialize an LP pool for a borrowable asset (e.g., USDC → bUSDC)",
+        "Step 1: Create the pool PDA"
+      ],
+      "discriminator": [
+        95,
+        180,
+        10,
+        172,
+        84,
+        174,
+        232,
+        40
+      ],
+      "accounts": [
+        {
+          "name": "lp_pool",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  112,
+                  95,
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "borrowable_mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "borrowable_mint"
+        },
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "initialize_pool_accounts",
+      "docs": [
+        "Initialize LP pool accounts (mint + vault)",
+        "Step 2: Create the LP token mint and vault"
+      ],
+      "discriminator": [
+        168,
+        30,
+        201,
+        19,
+        247,
+        28,
+        160,
+        210
+      ],
+      "accounts": [
+        {
+          "name": "lp_pool",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  112,
+                  95,
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "lp_pool.borrowable_mint",
+                "account": "LpPool"
+              }
+            ]
+          }
+        },
+        {
+          "name": "lp_token_mint",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  112,
+                  95,
+                  116,
+                  111,
+                  107,
+                  101,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "lp_pool.borrowable_mint",
+                "account": "LpPool"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  112,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "lp_pool.borrowable_mint",
+                "account": "LpPool"
+              }
+            ]
+          }
+        },
+        {
+          "name": "borrowable_mint",
+          "docs": [
+            "The original borrowable mint (USDC, etc.)"
+          ]
+        },
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "withdraw",
+      "docs": [
+        "Withdraw by burning LP tokens (e.g., burn bUSDC, get USDC + yield)"
+      ],
+      "discriminator": [
+        183,
+        18,
+        70,
+        156,
+        148,
+        109,
+        161,
+        34
+      ],
+      "accounts": [
+        {
+          "name": "lp_pool",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  112,
+                  95,
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "lp_pool.borrowable_mint",
+                "account": "LpPool"
+              }
+            ]
+          }
+        },
+        {
+          "name": "lp_token_mint",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  112,
+                  95,
+                  116,
+                  111,
+                  107,
+                  101,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "lp_pool.borrowable_mint",
+                "account": "LpPool"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  112,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "lp_pool.borrowable_mint",
+                "account": "LpPool"
+              }
+            ]
+          }
+        },
+        {
+          "name": "user_token_account",
+          "writable": true
+        },
+        {
+          "name": "user_lp_token_account",
+          "writable": true
+        },
+        {
+          "name": "withdrawer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "shares_amount",
+          "type": "u64"
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "LpPool",
+      "discriminator": [
+        185,
+        127,
+        131,
+        141,
+        197,
+        198,
+        170,
+        147
+      ]
+    },
+    {
+      "name": "Protocol",
+      "discriminator": [
+        45,
+        39,
+        101,
+        43,
+        115,
+        72,
+        131,
+        40
+      ]
+    }
+  ],
+  "types": [
+    {
+      "name": "LpPool",
+      "docs": [
+        "LP pool for a borrowable asset"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "borrowable_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "lp_token_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "total_deposits",
+            "type": "u64"
+          },
+          {
+            "name": "total_shares",
+            "type": "u64"
+          },
+          {
+            "name": "total_borrowed",
+            "type": "u64"
+          },
+          {
+            "name": "interest_earned",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Protocol",
+      "docs": [
+        "Protocol global state"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "treasury",
+            "type": "pubkey"
+          },
+          {
+            "name": "insurance_fund",
+            "type": "u64"
+          },
+          {
+            "name": "total_collateral_usd",
+            "type": "u64"
+          },
+          {
+            "name": "total_borrowed_usd",
+            "type": "u64"
+          },
+          {
+            "name": "paused",
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    }
+  ]
+}
