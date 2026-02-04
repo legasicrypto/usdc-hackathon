@@ -1,5 +1,5 @@
 import { Program, AnchorProvider, BN, Idl } from "@coral-xyz/anchor";
-import { Connection, PublicKey, SystemProgram, LAMPORTS_PER_SOL } from "@solana/web3.js";
+import { PublicKey, SystemProgram, LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
 
 // Import IDLs
@@ -123,9 +123,10 @@ export class LegasiClient {
     const [positionPDA] = getPositionPDA(owner);
     
     try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const position = await (this.lendingProgram.account as any).position.fetch(positionPDA);
       return position as Position;
-    } catch (e) {
+    } catch {
       return null;
     }
   }
@@ -157,7 +158,6 @@ export class LegasiClient {
   async borrow(amount: number): Promise<string> {
     const [positionPDA] = getPositionPDA(this.provider.wallet.publicKey);
     const [protocolPDA] = getProtocolPDA();
-    const [lpPoolPDA] = getLpPoolPDA(USDC_MINT);
     const [priceFeedPDA] = getPriceFeedPDA(SOL_MINT);
     
     const borrowVaultPDA = PublicKey.findProgramAddressSync(

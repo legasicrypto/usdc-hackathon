@@ -1,13 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useConnection, useWallet } from "@solana/wallet-adapter-react";
+import { useConnection, useWallet, AnchorWallet } from "@solana/wallet-adapter-react";
 import { AnchorProvider } from "@coral-xyz/anchor";
 import { 
   LegasiClient, 
   createLegasiClient, 
-  Position, 
-  getPositionPDA 
+  Position 
 } from "@/lib/legasi";
 
 export function useLegasi() {
@@ -20,14 +19,20 @@ export function useLegasi() {
 
   // Initialize client when wallet connects
   useEffect(() => {
-    if (!wallet.publicKey || !wallet.signTransaction) {
+    if (!wallet.publicKey || !wallet.signTransaction || !wallet.signAllTransactions) {
       setClient(null);
       return;
     }
 
+    const anchorWallet: AnchorWallet = {
+      publicKey: wallet.publicKey,
+      signTransaction: wallet.signTransaction,
+      signAllTransactions: wallet.signAllTransactions,
+    };
+
     const provider = new AnchorProvider(
       connection,
-      wallet as any,
+      anchorWallet,
       { commitment: "confirmed" }
     );
 
@@ -37,7 +42,7 @@ export function useLegasi() {
         console.error("Failed to create Legasi client:", err);
         setError("Failed to connect to Legasi protocol");
       });
-  }, [connection, wallet.publicKey, wallet.signTransaction]);
+  }, [connection, wallet]);
 
   // Fetch position when client is ready
   useEffect(() => {
@@ -64,8 +69,9 @@ export function useLegasi() {
       const newPosition = await client.getPosition(wallet.publicKey!);
       setPosition(newPosition);
       return tx;
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unknown error";
+      setError(message);
       throw err;
     } finally {
       setLoading(false);
@@ -85,8 +91,9 @@ export function useLegasi() {
       const newPosition = await client.getPosition(wallet.publicKey!);
       setPosition(newPosition);
       return tx;
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unknown error";
+      setError(message);
       throw err;
     } finally {
       setLoading(false);
@@ -106,8 +113,9 @@ export function useLegasi() {
       const newPosition = await client.getPosition(wallet.publicKey!);
       setPosition(newPosition);
       return tx;
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unknown error";
+      setError(message);
       throw err;
     } finally {
       setLoading(false);
@@ -128,8 +136,9 @@ export function useLegasi() {
     try {
       const tx = await client.configureAgent(dailyLimit, autoRepay, x402Enabled);
       return tx;
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unknown error";
+      setError(message);
       throw err;
     } finally {
       setLoading(false);
@@ -146,8 +155,9 @@ export function useLegasi() {
     try {
       const tx = await client.lpDeposit(amount);
       return tx;
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unknown error";
+      setError(message);
       throw err;
     } finally {
       setLoading(false);
