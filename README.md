@@ -268,6 +268,6 @@ MIT — see [LICENSE](LICENSE)
 
 **Legasi** — Credit infrastructure for the agentic economy.
 
-[Documentation](docs/) · [Demo](DEMO.md) · [Twitter](https://twitter.com/legaborateur)
+[Documentation](docs/) · [Demo](DEMO.md) · [Twitter](https://twitter.com/legasi_xyz)
 
 </div>
