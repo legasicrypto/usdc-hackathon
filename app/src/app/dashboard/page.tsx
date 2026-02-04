@@ -217,7 +217,7 @@ export default function Dashboard() {
                     </p>
                   </ActionCard>
 
-                  {/* Repay */}
+                  {/* Repay - Coming Soon */}
                   <ActionCard title="Repay" icon="✅">
                     <div className="flex gap-3">
                       <div className="flex-1 relative">
@@ -231,16 +231,13 @@ export default function Dashboard() {
                         <span className="absolute right-4 top-1/2 -translate-y-1/2 text-white/40">USDC</span>
                       </div>
                       <button
-                        onClick={() => {
-                          legasi.repay(parseFloat(repayAmount));
-                          setRepayAmount("");
-                        }}
-                        disabled={legasi.loading || !repayAmount}
+                        disabled={true}
                         className="px-6 py-4 bg-purple-500 hover:bg-purple-600 disabled:bg-white/10 disabled:text-white/30 rounded-xl font-semibold transition"
                       >
-                        Repay
+                        Soon
                       </button>
                     </div>
+                    <p className="text-white/40 text-sm mt-3">Repay function coming in next deploy</p>
                   </ActionCard>
                 </>
               )}
