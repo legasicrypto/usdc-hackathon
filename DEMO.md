@@ -1,301 +1,274 @@
-# 🎬 LEGASI Demo Flows
+# Legasi Demo Flows
 
-## 1. Basic User Flow
-
-### 1.1 Initialize Position
-```typescript
-// User connects wallet and creates a position
-await legasi.initializePosition();
-```
-
-### 1.2 Deposit Collateral (SOL)
-```typescript
-// Deposit 10 SOL as collateral
-await legasi.depositSol(10);
-// Position now has: 10 SOL collateral (~$1500 at $150/SOL)
-```
-
-### 1.3 Borrow USDC
-```typescript
-// Borrow $500 USDC (33% LTV)
-await legasi.borrow(500);
-// Max borrow at 75% LTV would be $1125
-```
-
-### 1.4 Repay Loan
-```typescript
-// Repay $250 of the loan
-await legasi.repay(250);
-// Remaining debt: $250 + accrued interest
-```
-
-### 1.5 Withdraw Collateral
-```typescript
-// Withdraw 3 SOL (still safe LTV)
-await legasi.withdraw(3);
-```
+> Demonstrating Agentic Credit Infrastructure in action.
 
 ---
 
-## 2. Agent Flow
+## 🤖 Agent Flows
 
-### 2.1 Configure Agent
+### Flow 1: Configure an AI Agent
+
+An operator sets up their AI agent with borrowing permissions.
+
 ```typescript
-// Enable agent with $1000/day limit
+// Operator configures their agent
 await legasi.configureAgent({
-  dailyBorrowLimit: 1000,
-  autoRepayEnabled: true,
-  x402Enabled: true,
-  alertThresholdBps: 7500  // Alert at 75% LTV
+  agent: agentPubkey,
+  maxBorrowUsd: 10_000,        // Max $10k borrowing
+  minCollateralRatio: 150,     // 150% collateralization required
+  allowedMints: [USDC, SOL],   // Can borrow USDC and SOL
+  autoRepayEnabled: true,      // Allow auto-repay
 });
 ```
 
-### 2.2 Agent Autonomous Borrow
+**Result:** Agent now has a credit line and can borrow autonomously.
+
+---
+
+### Flow 2: Agent Autonomous Borrowing
+
+Agent needs USDC to pay for an API call. It borrows automatically.
+
 ```typescript
-// Agent needs to pay for an API call
-// Agent borrows $50 (within daily limit)
-await program.methods
-  .agentBorrow(new BN(50_000_000)) // 50 USDC
-  .accounts({...})
-  .rpc();
+// Agent's internal logic
+const apiCost = 50; // $50 for API call
 
-// Daily limit updated: $950 remaining for today
+// Agent borrows from Legasi
+await legasi.agentBorrow({
+  agent: agentPubkey,
+  mint: USDC_MINT,
+  amount: apiCost * 1e6, // 50 USDC
+});
+
+// Agent pays for API
+await payApi(apiEndpoint, apiCost);
+
+// Later: Agent repays when it has funds
+await legasi.agentAutoRepay({
+  agent: agentPubkey,
+  amount: apiCost * 1e6,
+});
 ```
 
-### 2.3 x402 Payment Flow
+**Result:** Agent operated autonomously, built reputation with successful repayment.
+
+---
+
+### Flow 3: x402 Payment Protocol
+
+Agent encounters an HTTP 402 response and pays automatically.
+
 ```
-1. Agent → OpenAI API: "Generate text"
-2. API → Agent: HTTP 402 Payment Required
+1. Agent → API: GET /premium-data
+2. API → Agent: 402 Payment Required
    {
-     recipient: "5xyz...",
-     amount: 0.01 USDC,
-     payment_id: "abc123...",
-     expires_at: 1707123456
+     "invoice": "legasi:pay:50USDC:recipient123",
+     "expires": 1699999999
    }
-
-3. Agent → Legasi: x402_pay(payment_request, auto_borrow=true)
-   - If agent wallet has 0.01 USDC: Pay directly
-   - If not: Borrow 0.01 USDC first, then pay
-   - Receipt created on-chain
-
-4. Agent → OpenAI API: "Generate text" + payment_proof
-5. API → Agent: Generated text ✅
+3. Agent → Legasi: Borrow + Pay invoice
+4. Legasi → Recipient: Transfer USDC
+5. Agent → API: GET /premium-data (with payment proof)
+6. API → Agent: 200 OK + data
 ```
 
-### 2.4 Auto-Repay
 ```typescript
-// Agent receives payment from user (e.g., 100 USDC)
-// Auto-repay triggers automatically
-await program.methods
-  .agentAutoRepay(new BN(100_000_000))
-  .accounts({...})
-  .rpc();
+// Agent handles 402 automatically
+const response = await fetch(apiUrl);
 
-// Debt reduced by 100 USDC
-// Reputation score increases
+if (response.status === 402) {
+  const invoice = await response.json();
+  
+  // Pay via Legasi
+  await legasi.x402Pay({
+    invoice: invoice.data,
+    agent: agentPubkey,
+  });
+  
+  // Retry with payment proof
+  const data = await fetch(apiUrl, {
+    headers: { 'X-Payment-Proof': proofSignature }
+  });
+}
 ```
 
 ---
 
-## 3. LP (Liquidity Provider) Flow
+### Flow 4: Reputation Building
 
-### 3.1 Deposit to Pool
+Agent builds creditworthiness over time.
+
 ```typescript
-// LP deposits 10,000 USDC to earn yield
-await legasi.lpDeposit(10000);
-// Receives: bUSDC LP tokens representing share
+// Check agent's reputation
+const position = await legasi.getPosition(agentPubkey);
+
+console.log({
+  successfulRepayments: position.reputation.successfulRepayments,
+  totalRepaidUsd: position.reputation.totalRepaidUsd,
+  gadEvents: position.reputation.gadEvents,
+  accountAgeDays: position.reputation.accountAgeDays,
+  score: position.reputation.getScore(),
+  ltvBonus: position.reputation.getLtvBonusBps() + ' bps',
+});
+
+// Output:
+// {
+//   successfulRepayments: 47,
+//   totalRepaidUsd: 125000,
+//   gadEvents: 0,
+//   accountAgeDays: 90,
+//   score: 430,
+//   ltvBonus: '500 bps'  // +5% LTV!
+// }
 ```
 
-### 3.2 Earn Yield
-```
-- Borrowers pay interest (dynamic rate based on utilization)
-- Interest accrues to the pool
-- LP's bUSDC tokens appreciate in value
-- Current APY: ~8-15% depending on utilization
-```
+**Result:** Agent with good history gets +5% better borrowing terms.
 
-### 3.3 Withdraw
+---
+
+## 💰 LP Flows
+
+### Flow 5: Provide Liquidity
+
+LPs deposit assets to earn yield from agent borrowing.
+
 ```typescript
-// LP withdraws (burns bUSDC, receives USDC + yield)
-await legasi.lpWithdraw(5000);
-// Receives: 5000 USDC + accumulated yield
+// LP deposits USDC
+await legasi.deposit({
+  mint: USDC_MINT,
+  amount: 100_000 * 1e6, // 100k USDC
+});
+
+// Check position
+const lpPosition = await legasi.getLpPosition(wallet);
+console.log({
+  deposited: lpPosition.depositedAmount,
+  shares: lpPosition.shares,
+  earnedYield: lpPosition.accruedYield,
+});
 ```
 
 ---
 
-## 4. GAD (Gradual Auto-Deleveraging) Flow
+### Flow 6: Withdraw with Yield
 
-### 4.1 Normal Operation
-```
-Position: 10 SOL ($1500), $800 borrowed
-LTV: 53% ✅ Safe
-```
-
-### 4.2 Price Drops
-```
-SOL drops to $100
-Position: 10 SOL ($1000), $800 borrowed
-LTV: 80% ⚠️ Above threshold (77%)
-```
-
-### 4.3 GAD Triggers (permissionless crank)
 ```typescript
-// Anyone can call this to start GAD
-await program.methods
-  .crankGad()
-  .accounts({ position: positionPda, ... })
-  .rpc();
+// LP withdraws principal + yield
+await legasi.withdraw({
+  mint: USDC_MINT,
+  shares: lpPosition.shares, // All shares
+});
 
-// GAD sells small amount of collateral:
-// - Sells 0.5 SOL ($50) on Jupiter
-// - Repays $50 of debt
-// - New LTV: 75% (back to safe zone)
-
-// No harsh liquidation!
-// User keeps most of their position
-```
-
-### 4.4 GAD Benefits vs Traditional Liquidation
-
-| | Traditional | GAD |
-|---|---|---|
-| **Trigger** | 80% LTV | 77% LTV |
-| **Action** | Liquidate everything | Sell 2-5% of collateral |
-| **User Loss** | 10-15% penalty | ~0.5% slippage |
-| **Speed** | Instant (MEV vulnerable) | Gradual (MEV resistant) |
-| **Result** | Position closed | Position saved |
-
----
-
-## 5. Flash Loan Flow
-
-### 5.1 Arbitrage Example
-```typescript
-// Borrow 100,000 USDC in a flash loan
-const flashLoan = await program.methods
-  .flashBorrow(new BN(100_000_000_000))
-  .accounts({...})
-  .rpc();
-
-// Within the same transaction:
-// 1. Buy SOL cheap on DEX A
-// 2. Sell SOL expensive on DEX B
-// 3. Repay 100,000 USDC + 0.09% fee (90 USDC)
-// 4. Keep the profit!
-
-await program.methods
-  .flashRepay(new BN(100_090_000_000))
-  .accounts({...})
-  .rpc();
-```
-
-### 5.2 Collateral Swap
-```typescript
-// User wants to switch from SOL to cbBTC collateral
-// Without closing position:
-
-// 1. Flash borrow USDC to repay all debt
-// 2. Withdraw SOL collateral
-// 3. Swap SOL → cbBTC on Jupiter
-// 4. Deposit cbBTC as collateral
-// 5. Borrow USDC again
-// 6. Repay flash loan
-
-// All in one atomic transaction!
+// Receives: principal + accrued interest
 ```
 
 ---
 
-## 6. One-Click Leverage Flow
+## ⚡ Flash Loan Flow
 
-### 6.1 Open 3x Long SOL
+### Flow 7: Arbitrage Bot
+
 ```typescript
-// User has 10 SOL, wants 3x exposure
-await program.methods
-  .openLeveragePosition(
-    new BN(10 * LAMPORTS_PER_SOL), // 10 SOL
-    3, // 3x target leverage
-  )
-  .accounts({...})
-  .rpc();
-
-// What happens internally:
-// 1. Deposit 10 SOL as collateral ($1500)
-// 2. Borrow $1000 USDC (66% LTV)
-// 3. Swap $1000 USDC → 6.67 SOL on Jupiter
-// 4. Deposit 6.67 SOL as additional collateral
-// 5. Repeat until 3x achieved
-
-// Result: ~30 SOL exposure from 10 SOL initial
-```
-
-### 6.2 Close Leveraged Position
-```typescript
-await program.methods
-  .closeLeveragePosition()
-  .accounts({...})
-  .rpc();
-
-// Unwinds the position:
-// 1. Withdraw excess collateral
-// 2. Swap SOL → USDC
-// 3. Repay debt
-// 4. Return remaining SOL to user
+// Atomic arbitrage in one transaction
+await legasi.flashLoan({
+  mint: USDC_MINT,
+  amount: 1_000_000 * 1e6, // 1M USDC
+  
+  // Callback executed within the flash loan
+  callback: async (borrowedAmount) => {
+    // 1. Buy on DEX A (cheap)
+    const tokens = await dexA.swap(USDC, TOKEN, borrowedAmount);
+    
+    // 2. Sell on DEX B (expensive)
+    const profit = await dexB.swap(TOKEN, USDC, tokens);
+    
+    // 3. Repay flash loan + fee
+    const fee = borrowedAmount * 0.0009; // 0.09%
+    return borrowedAmount + fee;
+    
+    // 4. Keep profit!
+  }
+});
 ```
 
 ---
 
-## 7. Off-Ramp Flow (Bridge.xyz Integration)
+## 🛡️ Safety Flow
 
-### 7.1 Borrow and Off-Ramp to Bank
+### Flow 8: Gradual Auto-Deleveraging
+
+When collateral drops, GAD protects everyone.
+
+```
+Position: $10,000 collateral, $8,500 borrowed (85% LTV)
+Price drops → LTV reaches 90%
+
+GAD activates:
+- Hour 1: Sell $500 collateral → repay $500 debt
+- Hour 2: Sell $500 collateral → repay $500 debt
+- Hour 3: Position now at 75% LTV ✓
+
+No liquidation cascade. No MEV extraction.
+Agent keeps remaining position.
+```
+
 ```typescript
-// User wants to receive EUR in their bank account
-await program.methods
-  .offrampViaBridge(
-    requestId,
-    new BN(1000_000_000), // 1000 USDC
-    "FR7630006000011234567890189", // IBAN
-    "John Doe" // Recipient name
-  )
-  .accounts({...})
-  .rpc();
+// Anyone can trigger GAD (permissionless)
+await legasi.triggerGad({
+  position: positionPubkey,
+});
 
-// 1. Burns 1000 USDC from user's borrowed balance
-// 2. Creates OfframpRequest on-chain
-// 3. Bridge.xyz webhook picks it up
-// 4. User receives ~920 EUR in bank (after fees)
+// Caller receives small reward for helping
 ```
 
 ---
 
-## Key Metrics
+## 📊 Checking Protocol Stats
 
-| Metric | Value |
-|--------|-------|
-| Max LTV | 75% (+5% reputation bonus) |
-| Liquidation Threshold | 80% |
-| GAD Trigger | 77% |
-| Flash Loan Fee | 0.09% |
-| Base Interest Rate | 2% APR |
-| Max Interest Rate | 50% APR (at 100% utilization) |
-| Agent Daily Limit | Configurable per position |
+```typescript
+// Pool statistics
+const pool = await legasi.getPool(USDC_MINT);
+console.log({
+  totalDeposits: pool.totalDeposits,
+  totalBorrowed: pool.totalBorrowed,
+  utilization: pool.utilization + '%',
+  supplyApy: pool.supplyApy + '%',
+  borrowApy: pool.borrowApy + '%',
+});
+
+// Protocol-wide stats
+const protocol = await legasi.getProtocolState();
+console.log({
+  totalAgents: protocol.totalAgents,
+  totalBorrowVolume: protocol.totalBorrowVolume,
+  avgReputationScore: protocol.avgReputationScore,
+});
+```
 
 ---
 
-## CLI Commands (for testing)
+## 🔗 Devnet Addresses
+
+| Program | Address |
+|---------|---------|
+| legasi-core | `4FW9iFaerNuX1GstRKSsWo9UfnTbjtqch3fEHkWMF1Uy` |
+| legasi-flash | `Fj8CJNK1gBAuNR7dFbKLDckSstKmZn8ihTGwFXxfY93m` |
+| legasi-gad | `89E84ALdDdGGNuJAxho2H45aC25kqNdGg7QtwTJ3pngK` |
+| legasi-lending | *deploying...* |
+| legasi-lp | *deploying...* |
+| legasi-leverage | *deploying...* |
+
+---
+
+## Try It
 
 ```bash
-# Build all programs
-anchor build
+# Clone
+git clone https://github.com/legasicrypto/colosseum-agent-hackathon
+cd colosseum-agent-hackathon
 
-# Run tests
-anchor test
+# Install
+yarn install
 
-# Deploy to localnet
-solana-test-validator &
-anchor deploy --provider.cluster localnet
-
-# Deploy to devnet (needs ~5 SOL)
-solana config set --url devnet
-anchor deploy --provider.cluster devnet
+# Run demo
+yarn demo
 ```
