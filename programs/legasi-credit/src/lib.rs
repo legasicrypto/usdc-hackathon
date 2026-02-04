@@ -772,6 +772,222 @@ pub mod legasi_credit {
         
         Ok(())
     }
+    
+    // ========== SHORT POSITION INSTRUCTIONS ==========
+    
+    /// Initialize short system vault (admin only)
+    pub fn initialize_short_vault(_ctx: Context<InitializeShortVault>) -> Result<()> {
+        msg!("Short vault initialized");
+        Ok(())
+    }
+    
+    /// Initialize a short position for the user
+    pub fn initialize_short_position(ctx: Context<InitializeShortPosition>) -> Result<()> {
+        let short_position = &mut ctx.accounts.short_position;
+        short_position.owner = ctx.accounts.owner.key();
+        short_position.usdc_collateral = 0;
+        short_position.sol_borrowed = 0;
+        short_position.entry_price = 0;
+        short_position.last_update = Clock::get()?.unix_timestamp;
+        short_position.gad_config = GadConfig::default();
+        short_position.bump = ctx.bumps.short_position;
+        msg!("Short position initialized for {}", short_position.owner);
+        Ok(())
+    }
+    
+    /// One-Click Leverage Short
+    /// Deposits USDC collateral and borrows SOL in one atomic operation.
+    /// The borrowed SOL is intended to be swapped to USDC via Jupiter (client-side).
+    /// Profit when SOL price drops.
+    /// 
+    /// Flow (client composes):
+    /// 1. leverage_short(usdc_amount, target_leverage) - deposits USDC, borrows SOL
+    /// 2. Jupiter swap SOL → USDC (client instruction)
+    /// 3. User keeps extra USDC, position tracks debt in SOL
+    pub fn leverage_short(
+        ctx: Context<LeverageShort>,
+        usdc_amount: u64,
+        target_leverage_x10: u64,
+    ) -> Result<()> {
+        require!(usdc_amount > 0, ErrorCode::InvalidAmount);
+        require!(
+            target_leverage_x10 >= MIN_LEVERAGE_MULTIPLIER * 10 && 
+            target_leverage_x10 <= MAX_LEVERAGE_MULTIPLIER * 10,
+            ErrorCode::InvalidLeverage
+        );
+        
+        // Capture values before mutable borrows
+        let short_position_key = ctx.accounts.short_position.key();
+        let sol_price = ctx.accounts.protocol.sol_price_usd_6dec;
+        
+        // Transfer USDC from user to short collateral vault
+        token::transfer(
+            CpiContext::new(
+                ctx.accounts.token_program.to_account_info(),
+                Transfer {
+                    from: ctx.accounts.user_usdc.to_account_info(),
+                    to: ctx.accounts.short_collateral_vault.to_account_info(),
+                    authority: ctx.accounts.owner.to_account_info(),
+                },
+            ),
+            usdc_amount,
+        )?;
+        
+        // Update short position
+        let short_position = &mut ctx.accounts.short_position;
+        short_position.usdc_collateral = short_position.usdc_collateral.checked_add(usdc_amount).ok_or(ErrorCode::MathOverflow)?;
+        short_position.last_update = Clock::get()?.unix_timestamp;
+        
+        // Calculate max SOL to borrow (50% LTV on USDC collateral)
+        // usdc_collateral (6 dec) * LTV / sol_price (6 dec) * 10^9 = lamports
+        let max_borrow_sol = (short_position.usdc_collateral as u128)
+            .checked_mul(MAX_LTV_BPS as u128)
+            .ok_or(ErrorCode::MathOverflow)?
+            .checked_div(10000)
+            .ok_or(ErrorCode::MathOverflow)?
+            .checked_mul(1_000_000_000) // Convert to lamports
+            .ok_or(ErrorCode::MathOverflow)?
+            .checked_div(sol_price as u128)
+            .ok_or(ErrorCode::MathOverflow)? as u64;
+        
+        let available_to_borrow = max_borrow_sol.saturating_sub(short_position.sol_borrowed);
+        
+        // Check how much SOL is available in the collateral vaults (from long positions)
+        // For now, use the protocol's total_collateral as proxy
+        let borrow_sol = std::cmp::min(available_to_borrow, ctx.accounts.protocol.total_collateral / 10); // Max 10% of total collateral
+        
+        require!(borrow_sol > 0, ErrorCode::InsufficientLiquidity);
+        
+        // Update borrowed amount and entry price
+        if short_position.sol_borrowed == 0 {
+            short_position.entry_price = sol_price;
+        }
+        short_position.sol_borrowed = short_position.sol_borrowed.checked_add(borrow_sol).ok_or(ErrorCode::MathOverflow)?;
+        
+        // Capture final values for event
+        let final_collateral = short_position.usdc_collateral;
+        let final_debt = short_position.sol_borrowed;
+        
+        // Transfer SOL from protocol's collateral pool to user
+        // Note: In a real implementation, this would need a dedicated SOL lending pool
+        // For hackathon, we simulate by transferring from treasury
+        let bump = ctx.accounts.protocol.bump;
+        let seeds: &[&[u8]] = &[b"protocol", &[bump]];
+        
+        // Transfer borrowed SOL to user (wrapped SOL or native)
+        invoke_signed(
+            &system_instruction::transfer(ctx.accounts.treasury.key, ctx.accounts.owner.key, borrow_sol),
+            &[
+                ctx.accounts.treasury.to_account_info(),
+                ctx.accounts.owner.to_account_info(),
+                ctx.accounts.system_program.to_account_info(),
+            ],
+            &[seeds],
+        )?;
+        
+        // Update protocol
+        let protocol = &mut ctx.accounts.protocol;
+        protocol.total_short_collateral_usdc = protocol.total_short_collateral_usdc.checked_add(usdc_amount).ok_or(ErrorCode::MathOverflow)?;
+        protocol.total_short_borrowed_sol = protocol.total_short_borrowed_sol.checked_add(borrow_sol).ok_or(ErrorCode::MathOverflow)?;
+        
+        emit!(LeverageShortEvent {
+            position: short_position_key,
+            usdc_deposited: usdc_amount,
+            sol_borrowed: borrow_sol,
+            total_collateral: final_collateral,
+            total_debt_sol: final_debt,
+            entry_price: sol_price,
+            target_leverage_x10,
+        });
+        
+        msg!("Leverage Short: deposited {} USDC, borrowed {} SOL at ${}", 
+            usdc_amount / 1_000_000,
+            borrow_sol / 1_000_000_000,
+            sol_price / 1_000_000
+        );
+        
+        Ok(())
+    }
+    
+    /// Close short position: repay SOL debt and withdraw USDC collateral
+    pub fn close_short(ctx: Context<CloseShort>, sol_repay_amount: u64) -> Result<()> {
+        // Capture values before mutable borrows
+        let short_position_key = ctx.accounts.short_position.key();
+        let initial_debt = ctx.accounts.short_position.sol_borrowed;
+        let initial_collateral = ctx.accounts.short_position.usdc_collateral;
+        let protocol_bump = ctx.accounts.protocol.bump;
+        
+        let actual_repay = std::cmp::min(sol_repay_amount, initial_debt);
+        
+        require!(actual_repay > 0, ErrorCode::InvalidAmount);
+        
+        // Transfer SOL from user back to treasury (repaying debt)
+        invoke(
+            &system_instruction::transfer(ctx.accounts.owner.key, ctx.accounts.treasury.key, actual_repay),
+            &[
+                ctx.accounts.owner.to_account_info(),
+                ctx.accounts.treasury.to_account_info(),
+                ctx.accounts.system_program.to_account_info(),
+            ],
+        )?;
+        
+        // Update short position
+        let short_position = &mut ctx.accounts.short_position;
+        short_position.sol_borrowed = short_position.sol_borrowed.saturating_sub(actual_repay);
+        short_position.last_update = Clock::get()?.unix_timestamp;
+        
+        // Calculate how much USDC can be withdrawn (proportional to debt repaid)
+        let usdc_to_return = if initial_debt > 0 {
+            (initial_collateral as u128)
+                .checked_mul(actual_repay as u128)
+                .ok_or(ErrorCode::MathOverflow)?
+                .checked_div(initial_debt as u128)
+                .ok_or(ErrorCode::MathOverflow)? as u64
+        } else {
+            0
+        };
+        
+        // Transfer USDC back to user
+        if usdc_to_return > 0 {
+            let seeds: &[&[u8]] = &[b"protocol", &[protocol_bump]];
+            
+            token::transfer(
+                CpiContext::new_with_signer(
+                    ctx.accounts.token_program.to_account_info(),
+                    Transfer {
+                        from: ctx.accounts.short_collateral_vault.to_account_info(),
+                        to: ctx.accounts.user_usdc.to_account_info(),
+                        authority: ctx.accounts.protocol.to_account_info(),
+                    },
+                    &[seeds],
+                ),
+                usdc_to_return,
+            )?;
+            
+            short_position.usdc_collateral = short_position.usdc_collateral.saturating_sub(usdc_to_return);
+        }
+        
+        // Capture final values
+        let final_collateral = short_position.usdc_collateral;
+        let final_debt = short_position.sol_borrowed;
+        
+        // Update protocol
+        let protocol = &mut ctx.accounts.protocol;
+        protocol.total_short_collateral_usdc = protocol.total_short_collateral_usdc.saturating_sub(usdc_to_return);
+        protocol.total_short_borrowed_sol = protocol.total_short_borrowed_sol.saturating_sub(actual_repay);
+        
+        emit!(CloseShortEvent {
+            position: short_position_key,
+            sol_repaid: actual_repay,
+            usdc_returned: usdc_to_return,
+            remaining_collateral: final_collateral,
+            remaining_debt: final_debt,
+        });
+        
+        msg!("Close short: repaid {} SOL, returned {} USDC", actual_repay, usdc_to_return);
+        
+        Ok(())
+    }
 
     /// GAD Crank
     pub fn crank_gad(ctx: Context<CrankGad>) -> Result<()> {
@@ -1124,6 +1340,68 @@ pub struct Deleverage<'info> {
     pub system_program: Program<'info, System>,
 }
 
+// ========== SHORT POSITION ACCOUNTS ==========
+
+#[derive(Accounts)]
+pub struct InitializeShortVault<'info> {
+    #[account(mut, seeds = [b"protocol"], bump = protocol.bump, has_one = admin)]
+    pub protocol: Account<'info, Protocol>,
+    #[account(init, payer = admin, token::mint = usdc_mint, token::authority = protocol, seeds = [b"short_collateral_vault"], bump)]
+    pub short_collateral_vault: Account<'info, TokenAccount>,
+    pub usdc_mint: Account<'info, Mint>,
+    #[account(mut)]
+    pub admin: Signer<'info>,
+    pub token_program: Program<'info, Token>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct InitializeShortPosition<'info> {
+    #[account(init, payer = owner, space = 8 + ShortPosition::INIT_SPACE, seeds = [b"short_position", owner.key().as_ref()], bump)]
+    pub short_position: Account<'info, ShortPosition>,
+    #[account(mut)]
+    pub owner: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct LeverageShort<'info> {
+    #[account(mut, seeds = [b"short_position", owner.key().as_ref()], bump = short_position.bump, has_one = owner)]
+    pub short_position: Account<'info, ShortPosition>,
+    #[account(mut, seeds = [b"protocol"], bump = protocol.bump, has_one = treasury)]
+    pub protocol: Account<'info, Protocol>,
+    #[account(mut, seeds = [b"short_collateral_vault"], bump)]
+    pub short_collateral_vault: Account<'info, TokenAccount>,
+    #[account(mut)]
+    pub user_usdc: Account<'info, TokenAccount>,
+    /// CHECK: Treasury for SOL transfers
+    #[account(mut)]
+    pub treasury: UncheckedAccount<'info>,
+    #[account(mut)]
+    pub owner: Signer<'info>,
+    pub token_program: Program<'info, Token>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct CloseShort<'info> {
+    #[account(mut, seeds = [b"short_position", owner.key().as_ref()], bump = short_position.bump, has_one = owner)]
+    pub short_position: Account<'info, ShortPosition>,
+    #[account(mut, seeds = [b"protocol"], bump = protocol.bump, has_one = treasury)]
+    pub protocol: Account<'info, Protocol>,
+    #[account(mut, seeds = [b"short_collateral_vault"], bump)]
+    pub short_collateral_vault: Account<'info, TokenAccount>,
+    #[account(mut)]
+    pub user_usdc: Account<'info, TokenAccount>,
+    /// CHECK: Treasury for SOL transfers
+    #[account(mut)]
+    pub treasury: UncheckedAccount<'info>,
+    #[account(mut)]
+    pub owner: Signer<'info>,
+    pub token_program: Program<'info, Token>,
+    pub system_program: Program<'info, System>,
+}
+
 // ========== DATA ==========
 
 #[account]
@@ -1141,6 +1419,9 @@ pub struct Protocol {
     pub total_lp_shares: u64,
     pub insurance_fund: u64,
     pub total_interest_earned: u64,
+    // Short position tracking
+    pub total_short_collateral_usdc: u64,
+    pub total_short_borrowed_sol: u64,
     pub bump: u8,
 }
 
@@ -1155,6 +1436,20 @@ pub struct Position {
     pub gad_config: GadConfig,
     pub total_gad_liquidated: u64,
     pub reputation: Reputation,
+    pub bump: u8,
+}
+
+/// Short position: USDC collateral, borrow SOL
+/// Used for shorting SOL (betting price will go down)
+#[account]
+#[derive(InitSpace)]
+pub struct ShortPosition {
+    pub owner: Pubkey,
+    pub usdc_collateral: u64,      // USDC deposited as collateral (6 decimals)
+    pub sol_borrowed: u64,          // SOL borrowed (9 decimals, in lamports)
+    pub entry_price: u64,           // SOL price when position opened (6 decimals)
+    pub last_update: i64,
+    pub gad_config: GadConfig,
     pub bump: u8,
 }
 
@@ -1261,6 +1556,26 @@ pub struct DeleverageEvent {
     pub position: Pubkey,
     pub usdc_repaid: u64,
     pub sol_withdrawn: u64,
+    pub remaining_collateral: u64,
+    pub remaining_debt: u64,
+}
+
+#[event]
+pub struct LeverageShortEvent {
+    pub position: Pubkey,
+    pub usdc_deposited: u64,
+    pub sol_borrowed: u64,
+    pub total_collateral: u64,
+    pub total_debt_sol: u64,
+    pub entry_price: u64,
+    pub target_leverage_x10: u64,
+}
+
+#[event]
+pub struct CloseShortEvent {
+    pub position: Pubkey,
+    pub sol_repaid: u64,
+    pub usdc_returned: u64,
     pub remaining_collateral: u64,
     pub remaining_debt: u64,
 }
