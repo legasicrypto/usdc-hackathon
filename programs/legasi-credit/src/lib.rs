@@ -2,6 +2,7 @@ use anchor_lang::prelude::*;
 use anchor_lang::solana_program::program::invoke;
 use anchor_lang::solana_program::program::invoke_signed;
 use anchor_lang::solana_program::system_instruction;
+use anchor_spl::token::{self, Mint, Token, TokenAccount, Transfer, MintTo, Burn};
 
 declare_id!("7bv6nbBwrPUEHnusd4zsHMdRy3btP8sEKW7sq7Hxode5");
 
@@ -9,58 +10,192 @@ declare_id!("7bv6nbBwrPUEHnusd4zsHMdRy3btP8sEKW7sq7Hxode5");
 const MAX_LTV_BPS: u64 = 5000; // 50% max LTV
 const GAD_START_LTV_BPS: u64 = 5000; // GAD starts at 50%
 const SECONDS_PER_DAY: i64 = 86400;
+const INSURANCE_FEE_BPS: u64 = 500; // 5% of interest goes to insurance
+const BUSDC_DECIMALS: u8 = 6;
 
-/// GAD Rate tiers (basis points per day)
-/// 50-55% LTV: 10 bps/day (0.1%)
-/// 55-65% LTV: 100 bps/day (1%)
-/// 65-75% LTV: 500 bps/day (5%)
-/// 75%+ LTV: 1000 bps/day (10%)
-fn get_gad_rate_bps(ltv_bps: u64) -> u64 {
-    if ltv_bps <= 5000 {
-        0
-    } else if ltv_bps <= 5500 {
-        10
-    } else if ltv_bps <= 6500 {
-        100
-    } else if ltv_bps <= 7500 {
-        500
-    } else {
-        1000
+/// GAD continuous curve (LIF-style)
+fn get_gad_rate_bps(ltv_bps: u64, start_ltv_bps: u64) -> u64 {
+    if ltv_bps <= start_ltv_bps {
+        return 0;
     }
+    let excess = ltv_bps.saturating_sub(start_ltv_bps);
+    // Quadratic curve: rate = excess^2 / 100, capped at 1000 bps/day
+    let rate = (excess as u128).pow(2).checked_div(100).unwrap_or(0) as u64;
+    std::cmp::min(rate, 1000)
 }
 
 #[program]
 pub mod legasi_credit {
     use super::*;
 
-    /// Initialize the protocol (admin only, once)
+    /// Initialize the protocol
     pub fn initialize_protocol(ctx: Context<InitializeProtocol>, sol_price_usd: u64) -> Result<()> {
         let protocol = &mut ctx.accounts.protocol;
         protocol.admin = ctx.accounts.admin.key();
-        protocol.sol_price_usd_6dec = sol_price_usd; // Price with 6 decimals (e.g., 100_000_000 = $100)
+        protocol.sol_price_usd_6dec = sol_price_usd;
         protocol.last_price_update = Clock::get()?.unix_timestamp;
         protocol.total_collateral = 0;
         protocol.total_borrowed = 0;
         protocol.treasury = ctx.accounts.treasury.key();
+        protocol.usdc_mint = ctx.accounts.usdc_mint.key();
+        protocol.busdc_mint = Pubkey::default();
+        protocol.total_lp_deposits = 0;
+        protocol.total_lp_shares = 0;
+        protocol.insurance_fund = 0;
+        protocol.total_interest_earned = 0;
         protocol.bump = ctx.bumps.protocol;
         
-        msg!("Protocol initialized with SOL price ${}", sol_price_usd / 1_000_000);
+        msg!("Protocol initialized");
         Ok(())
     }
 
-    /// Update SOL price (admin/oracle only)
+    /// Initialize LP system with bUSDC mint
+    pub fn initialize_lp(ctx: Context<InitializeLp>) -> Result<()> {
+        let protocol = &mut ctx.accounts.protocol;
+        protocol.busdc_mint = ctx.accounts.busdc_mint.key();
+        msg!("LP system initialized with bUSDC: {}", protocol.busdc_mint);
+        Ok(())
+    }
+
+    /// LP deposits USDC, receives bUSDC tokens
+    pub fn lp_deposit(ctx: Context<LpDeposit>, usdc_amount: u64) -> Result<()> {
+        require!(usdc_amount > 0, ErrorCode::InvalidAmount);
+        
+        let protocol = &ctx.accounts.protocol;
+        
+        // Calculate shares: if first deposit, 1:1; else proportional
+        let shares_to_mint = if protocol.total_lp_shares == 0 {
+            usdc_amount
+        } else {
+            (usdc_amount as u128)
+                .checked_mul(protocol.total_lp_shares as u128)
+                .ok_or(ErrorCode::MathOverflow)?
+                .checked_div(protocol.total_lp_deposits as u128)
+                .ok_or(ErrorCode::MathOverflow)? as u64
+        };
+        
+        require!(shares_to_mint > 0, ErrorCode::InvalidAmount);
+        
+        // Transfer USDC from user to vault
+        token::transfer(
+            CpiContext::new(
+                ctx.accounts.token_program.key(),
+                Transfer {
+                    from: ctx.accounts.user_usdc.to_account_info(),
+                    to: ctx.accounts.usdc_vault.to_account_info(),
+                    authority: ctx.accounts.depositor.to_account_info(),
+                },
+            ),
+            usdc_amount,
+        )?;
+        
+        // Mint bUSDC to user
+        let bump = ctx.accounts.protocol.bump;
+        let seeds: &[&[u8]] = &[b"protocol", &[bump]];
+        
+        token::mint_to(
+            CpiContext::new_with_signer(
+                ctx.accounts.token_program.key(),
+                MintTo {
+                    mint: ctx.accounts.busdc_mint.to_account_info(),
+                    to: ctx.accounts.user_busdc.to_account_info(),
+                    authority: ctx.accounts.protocol.to_account_info(),
+                },
+                &[seeds],
+            ),
+            shares_to_mint,
+        )?;
+        
+        // Update protocol
+        let protocol = &mut ctx.accounts.protocol;
+        protocol.total_lp_deposits = protocol.total_lp_deposits.checked_add(usdc_amount).ok_or(ErrorCode::MathOverflow)?;
+        protocol.total_lp_shares = protocol.total_lp_shares.checked_add(shares_to_mint).ok_or(ErrorCode::MathOverflow)?;
+        
+        msg!("LP deposited {} USDC, received {} bUSDC", usdc_amount, shares_to_mint);
+        
+        emit!(LpDepositEvent {
+            depositor: ctx.accounts.depositor.key(),
+            usdc_amount,
+            shares_minted: shares_to_mint,
+        });
+        
+        Ok(())
+    }
+
+    /// LP burns bUSDC, receives USDC + yield
+    pub fn lp_withdraw(ctx: Context<LpWithdraw>, shares_amount: u64) -> Result<()> {
+        require!(shares_amount > 0, ErrorCode::InvalidAmount);
+        
+        let protocol = &ctx.accounts.protocol;
+        require!(protocol.total_lp_shares > 0, ErrorCode::NoLpShares);
+        
+        // Calculate USDC to return
+        let usdc_to_return = (shares_amount as u128)
+            .checked_mul(protocol.total_lp_deposits as u128)
+            .ok_or(ErrorCode::MathOverflow)?
+            .checked_div(protocol.total_lp_shares as u128)
+            .ok_or(ErrorCode::MathOverflow)? as u64;
+        
+        require!(usdc_to_return > 0, ErrorCode::InvalidAmount);
+        require!(ctx.accounts.usdc_vault.amount >= usdc_to_return, ErrorCode::InsufficientLiquidity);
+        
+        // Burn bUSDC
+        token::burn(
+            CpiContext::new(
+                ctx.accounts.token_program.key(),
+                Burn {
+                    mint: ctx.accounts.busdc_mint.to_account_info(),
+                    from: ctx.accounts.user_busdc.to_account_info(),
+                    authority: ctx.accounts.withdrawer.to_account_info(),
+                },
+            ),
+            shares_amount,
+        )?;
+        
+        // Transfer USDC to user
+        let bump = ctx.accounts.protocol.bump;
+        let seeds: &[&[u8]] = &[b"protocol", &[bump]];
+        
+        token::transfer(
+            CpiContext::new_with_signer(
+                ctx.accounts.token_program.key(),
+                Transfer {
+                    from: ctx.accounts.usdc_vault.to_account_info(),
+                    to: ctx.accounts.user_usdc.to_account_info(),
+                    authority: ctx.accounts.protocol.to_account_info(),
+                },
+                &[seeds],
+            ),
+            usdc_to_return,
+        )?;
+        
+        // Update protocol
+        let protocol = &mut ctx.accounts.protocol;
+        protocol.total_lp_deposits = protocol.total_lp_deposits.saturating_sub(usdc_to_return);
+        protocol.total_lp_shares = protocol.total_lp_shares.saturating_sub(shares_amount);
+        
+        msg!("LP withdrew {} bUSDC, received {} USDC", shares_amount, usdc_to_return);
+        
+        emit!(LpWithdrawEvent {
+            withdrawer: ctx.accounts.withdrawer.key(),
+            shares_burned: shares_amount,
+            usdc_received: usdc_to_return,
+        });
+        
+        Ok(())
+    }
+
+    /// Update SOL price
     pub fn update_price(ctx: Context<UpdatePrice>, new_price_usd: u64) -> Result<()> {
         require!(new_price_usd > 0, ErrorCode::InvalidAmount);
-        
         let protocol = &mut ctx.accounts.protocol;
         protocol.sol_price_usd_6dec = new_price_usd;
         protocol.last_price_update = Clock::get()?.unix_timestamp;
-        
-        msg!("Price updated to ${}.{:06}", new_price_usd / 1_000_000, new_price_usd % 1_000_000);
+        msg!("Price updated to ${}", new_price_usd / 1_000_000);
         Ok(())
     }
 
-    /// Initialize a new credit position for a user
+    /// Initialize position
     pub fn initialize_position(ctx: Context<InitializePosition>) -> Result<()> {
         let position = &mut ctx.accounts.position;
         position.owner = ctx.accounts.owner.key();
@@ -70,50 +205,33 @@ pub mod legasi_credit {
         position.last_gad_crank = Clock::get()?.unix_timestamp;
         position.gad_config = GadConfig::default();
         position.total_gad_liquidated = 0;
+        position.reputation = Reputation::default();
         position.bump = ctx.bumps.position;
-        
         msg!("Position initialized for {}", position.owner);
         Ok(())
     }
 
-    /// Configure GAD settings for a position
-    pub fn configure_gad(
-        ctx: Context<ConfigureGad>,
-        enabled: bool,
-        custom_start_ltv_bps: Option<u64>,
-        min_collateral_floor: Option<u64>,
-    ) -> Result<()> {
+    /// Configure GAD
+    pub fn configure_gad(ctx: Context<ConfigureGad>, enabled: bool, custom_start_ltv_bps: Option<u64>, min_collateral_floor: Option<u64>) -> Result<()> {
         let position = &mut ctx.accounts.position;
-        
         position.gad_config.enabled = enabled;
-        
-        if let Some(start_ltv) = custom_start_ltv_bps {
-            require!(start_ltv >= 4000 && start_ltv <= 7000, ErrorCode::InvalidGadConfig);
-            position.gad_config.custom_start_ltv_bps = start_ltv;
+        if let Some(ltv) = custom_start_ltv_bps {
+            require!(ltv >= 4000 && ltv <= 7000, ErrorCode::InvalidGadConfig);
+            position.gad_config.custom_start_ltv_bps = ltv;
         }
-        
         if let Some(floor) = min_collateral_floor {
             position.gad_config.min_collateral_floor = floor;
         }
-        
-        msg!("GAD configured: enabled={}, start_ltv={}bps, floor={}", 
-            enabled, 
-            position.gad_config.custom_start_ltv_bps,
-            position.gad_config.min_collateral_floor
-        );
+        msg!("GAD configured");
         Ok(())
     }
 
-    /// Deposit SOL as collateral
+    /// Deposit SOL collateral
     pub fn deposit_collateral(ctx: Context<DepositCollateral>, amount: u64) -> Result<()> {
         require!(amount > 0, ErrorCode::InvalidAmount);
         
         invoke(
-            &system_instruction::transfer(
-                ctx.accounts.owner.key,
-                ctx.accounts.collateral_vault.key,
-                amount,
-            ),
+            &system_instruction::transfer(ctx.accounts.owner.key, ctx.accounts.collateral_vault.key, amount),
             &[
                 ctx.accounts.owner.to_account_info(),
                 ctx.accounts.collateral_vault.to_account_info(),
@@ -122,71 +240,99 @@ pub mod legasi_credit {
         )?;
         
         let position = &mut ctx.accounts.position;
-        position.collateral_amount = position.collateral_amount.checked_add(amount)
-            .ok_or(ErrorCode::MathOverflow)?;
+        position.collateral_amount = position.collateral_amount.checked_add(amount).ok_or(ErrorCode::MathOverflow)?;
         position.last_update = Clock::get()?.unix_timestamp;
         
-        // Update protocol stats
         let protocol = &mut ctx.accounts.protocol;
-        protocol.total_collateral = protocol.total_collateral.checked_add(amount)
-            .ok_or(ErrorCode::MathOverflow)?;
+        protocol.total_collateral = protocol.total_collateral.checked_add(amount).ok_or(ErrorCode::MathOverflow)?;
         
-        msg!("Deposited {} lamports as collateral", amount);
+        msg!("Deposited {} lamports", amount);
         Ok(())
     }
 
-    /// Borrow against collateral (accounting only - USDC transfer handled separately)
-    pub fn borrow(ctx: Context<Borrow>, amount: u64) -> Result<()> {
+    /// Borrow USDC
+    pub fn borrow(ctx: Context<BorrowUsdc>, amount: u64) -> Result<()> {
         require!(amount > 0, ErrorCode::InvalidAmount);
+        require!(ctx.accounts.usdc_vault.amount >= amount, ErrorCode::InsufficientLiquidity);
         
-        let position = &mut ctx.accounts.position;
+        let position = &ctx.accounts.position;
         let protocol = &ctx.accounts.protocol;
         
-        let sol_price_usd = protocol.sol_price_usd_6dec;
+        // Calculate max borrow with reputation bonus
+        let base_ltv = MAX_LTV_BPS;
+        let bonus = position.reputation.get_ltv_bonus_bps();
+        let effective_ltv = base_ltv.saturating_add(bonus);
         
-        // Calculate max borrowable (50% LTV)
-        // collateral in lamports, price in 6 decimals
-        let collateral_value_usd = (position.collateral_amount as u128)
-            .checked_mul(sol_price_usd as u128)
+        let collateral_value = (position.collateral_amount as u128)
+            .checked_mul(protocol.sol_price_usd_6dec as u128)
             .ok_or(ErrorCode::MathOverflow)?
-            .checked_div(1_000_000_000) // Convert lamports to SOL
+            .checked_div(1_000_000_000)
             .ok_or(ErrorCode::MathOverflow)?;
         
-        let max_borrow = collateral_value_usd
-            .checked_mul(MAX_LTV_BPS as u128)
+        let max_borrow = collateral_value
+            .checked_mul(effective_ltv as u128)
             .ok_or(ErrorCode::MathOverflow)?
             .checked_div(10000)
             .ok_or(ErrorCode::MathOverflow)? as u64;
         
-        let new_borrowed = position.borrowed_amount.checked_add(amount)
-            .ok_or(ErrorCode::MathOverflow)?;
-        
+        let new_borrowed = position.borrowed_amount.checked_add(amount).ok_or(ErrorCode::MathOverflow)?;
         require!(new_borrowed <= max_borrow, ErrorCode::ExceedsLTV);
         
+        // Transfer USDC
+        let bump = protocol.bump;
+        let seeds: &[&[u8]] = &[b"protocol", &[bump]];
+        
+        token::transfer(
+            CpiContext::new_with_signer(
+                ctx.accounts.token_program.key(),
+                Transfer {
+                    from: ctx.accounts.usdc_vault.to_account_info(),
+                    to: ctx.accounts.user_usdc.to_account_info(),
+                    authority: ctx.accounts.protocol.to_account_info(),
+                },
+                &[seeds],
+            ),
+            amount,
+        )?;
+        
+        let position = &mut ctx.accounts.position;
         position.borrowed_amount = new_borrowed;
         position.last_update = Clock::get()?.unix_timestamp;
         
-        // Update protocol stats
         let protocol = &mut ctx.accounts.protocol;
-        protocol.total_borrowed = protocol.total_borrowed.checked_add(amount)
-            .ok_or(ErrorCode::MathOverflow)?;
+        protocol.total_borrowed = protocol.total_borrowed.checked_add(amount).ok_or(ErrorCode::MathOverflow)?;
         
-        msg!("Borrowed {} USDC (max: {}, LTV: {}%)", amount, max_borrow, new_borrowed * 100 / max_borrow);
+        msg!("Borrowed {} USDC", amount);
         Ok(())
     }
 
-    /// Repay borrowed USDC
-    pub fn repay(ctx: Context<Repay>, amount: u64) -> Result<()> {
+    /// Repay USDC
+    pub fn repay(ctx: Context<RepayUsdc>, amount: u64) -> Result<()> {
         require!(amount > 0, ErrorCode::InvalidAmount);
         
-        let position = &mut ctx.accounts.position;
+        let position = &ctx.accounts.position;
         let repay_amount = std::cmp::min(amount, position.borrowed_amount);
         
-        position.borrowed_amount = position.borrowed_amount.checked_sub(repay_amount)
-            .ok_or(ErrorCode::MathOverflow)?;
-        position.last_update = Clock::get()?.unix_timestamp;
+        // Transfer USDC
+        token::transfer(
+            CpiContext::new(
+                ctx.accounts.token_program.key(),
+                Transfer {
+                    from: ctx.accounts.user_usdc.to_account_info(),
+                    to: ctx.accounts.usdc_vault.to_account_info(),
+                    authority: ctx.accounts.owner.to_account_info(),
+                },
+            ),
+            repay_amount,
+        )?;
         
-        // Update protocol stats
+        // Update position
+        let position = &mut ctx.accounts.position;
+        position.borrowed_amount = position.borrowed_amount.saturating_sub(repay_amount);
+        position.last_update = Clock::get()?.unix_timestamp;
+        position.reputation.successful_repayments = position.reputation.successful_repayments.saturating_add(1);
+        position.reputation.total_repaid = position.reputation.total_repaid.saturating_add(repay_amount);
+        
         let protocol = &mut ctx.accounts.protocol;
         protocol.total_borrowed = protocol.total_borrowed.saturating_sub(repay_amount);
         
@@ -194,7 +340,7 @@ pub mod legasi_credit {
         Ok(())
     }
 
-    /// Withdraw collateral (if LTV allows)
+    /// Withdraw collateral
     pub fn withdraw_collateral(ctx: Context<WithdrawCollateral>, amount: u64) -> Result<()> {
         require!(amount > 0, ErrorCode::InvalidAmount);
         
@@ -202,14 +348,12 @@ pub mod legasi_credit {
         let protocol = &ctx.accounts.protocol;
         require!(amount <= position.collateral_amount, ErrorCode::InsufficientCollateral);
         
-        let remaining_collateral = position.collateral_amount.checked_sub(amount)
-            .ok_or(ErrorCode::MathOverflow)?;
+        let remaining = position.collateral_amount.checked_sub(amount).ok_or(ErrorCode::MathOverflow)?;
         
         // Check LTV after withdrawal
         if position.borrowed_amount > 0 {
-            let sol_price_usd = protocol.sol_price_usd_6dec;
-            let remaining_value = (remaining_collateral as u128)
-                .checked_mul(sol_price_usd as u128)
+            let remaining_value = (remaining as u128)
+                .checked_mul(protocol.sol_price_usd_6dec as u128)
                 .ok_or(ErrorCode::MathOverflow)?
                 .checked_div(1_000_000_000)
                 .ok_or(ErrorCode::MathOverflow)?;
@@ -223,23 +367,15 @@ pub mod legasi_credit {
             require!(position.borrowed_amount <= max_borrow, ErrorCode::ExceedsLTV);
         }
         
-        // Check collateral floor
-        require!(
-            remaining_collateral >= position.gad_config.min_collateral_floor,
-            ErrorCode::BelowCollateralFloor
-        );
+        require!(remaining >= position.gad_config.min_collateral_floor, ErrorCode::BelowCollateralFloor);
         
-        // Transfer from vault
+        // Transfer SOL
         let position_key = ctx.accounts.position.key();
         let vault_bump = ctx.bumps.collateral_vault;
         let seeds: &[&[u8]] = &[b"vault", position_key.as_ref(), &[vault_bump]];
         
         invoke_signed(
-            &system_instruction::transfer(
-                ctx.accounts.collateral_vault.key,
-                ctx.accounts.owner.key,
-                amount,
-            ),
+            &system_instruction::transfer(ctx.accounts.collateral_vault.key, ctx.accounts.owner.key, amount),
             &[
                 ctx.accounts.collateral_vault.to_account_info(),
                 ctx.accounts.owner.to_account_info(),
@@ -249,10 +385,9 @@ pub mod legasi_credit {
         )?;
         
         let position = &mut ctx.accounts.position;
-        position.collateral_amount = remaining_collateral;
+        position.collateral_amount = remaining;
         position.last_update = Clock::get()?.unix_timestamp;
         
-        // Update protocol stats
         let protocol = &mut ctx.accounts.protocol;
         protocol.total_collateral = protocol.total_collateral.saturating_sub(amount);
         
@@ -260,10 +395,62 @@ pub mod legasi_credit {
         Ok(())
     }
 
-    /// GAD Crank - Anyone can call this to process gradual auto-deleveraging
-    /// Caller receives a small reward for keeping the system healthy
+    /// Flash loan
+    pub fn flash_loan(ctx: Context<FlashLoan>, amount: u64) -> Result<()> {
+        require!(amount > 0, ErrorCode::InvalidAmount);
+        require!(ctx.accounts.usdc_vault.amount >= amount, ErrorCode::InsufficientLiquidity);
+        
+        let fee = std::cmp::max(amount.checked_mul(5).unwrap_or(0).checked_div(10000).unwrap_or(0), 1);
+        
+        let bump = ctx.accounts.protocol.bump;
+        let seeds: &[&[u8]] = &[b"protocol", &[bump]];
+        
+        token::transfer(
+            CpiContext::new_with_signer(
+                ctx.accounts.token_program.key(),
+                Transfer {
+                    from: ctx.accounts.usdc_vault.to_account_info(),
+                    to: ctx.accounts.user_usdc.to_account_info(),
+                    authority: ctx.accounts.protocol.to_account_info(),
+                },
+                &[seeds],
+            ),
+            amount,
+        )?;
+        
+        emit!(FlashLoanInitiated { borrower: ctx.accounts.borrower.key(), amount, fee });
+        msg!("Flash loan: {} USDC, fee: {}", amount, fee);
+        Ok(())
+    }
+
+    /// Repay flash loan
+    pub fn repay_flash_loan(ctx: Context<RepayFlashLoan>, amount: u64, fee: u64) -> Result<()> {
+        let total = amount.checked_add(fee).ok_or(ErrorCode::MathOverflow)?;
+        
+        token::transfer(
+            CpiContext::new(
+                ctx.accounts.token_program.key(),
+                Transfer {
+                    from: ctx.accounts.user_usdc.to_account_info(),
+                    to: ctx.accounts.usdc_vault.to_account_info(),
+                    authority: ctx.accounts.borrower.to_account_info(),
+                },
+            ),
+            total,
+        )?;
+        
+        let protocol = &mut ctx.accounts.protocol;
+        let insurance = fee.checked_mul(INSURANCE_FEE_BPS).unwrap_or(0).checked_div(10000).unwrap_or(0);
+        protocol.insurance_fund = protocol.insurance_fund.saturating_add(insurance);
+        protocol.total_lp_deposits = protocol.total_lp_deposits.saturating_add(fee.saturating_sub(insurance));
+        
+        emit!(FlashLoanRepaid { borrower: ctx.accounts.borrower.key(), amount, fee });
+        msg!("Flash loan repaid");
+        Ok(())
+    }
+
+    /// GAD Crank
     pub fn crank_gad(ctx: Context<CrankGad>) -> Result<()> {
-        // Get immutable values first (before any mutable borrows)
         let position_key = ctx.accounts.position.key();
         let vault_bump = ctx.bumps.collateral_vault;
         let cranker_key = ctx.accounts.cranker.key();
@@ -271,88 +458,60 @@ pub mod legasi_credit {
         let position = &ctx.accounts.position;
         let protocol = &ctx.accounts.protocol;
         
-        // Check if GAD is enabled
         require!(position.gad_config.enabled, ErrorCode::GadDisabled);
-        
-        // Check if there's debt to deleverage
         require!(position.borrowed_amount > 0, ErrorCode::NoDebtToDeleverage);
         
-        let sol_price_usd = protocol.sol_price_usd_6dec;
-        
-        // Calculate current LTV
-        let collateral_value_usd = (position.collateral_amount as u128)
-            .checked_mul(sol_price_usd as u128)
+        let collateral_value = (position.collateral_amount as u128)
+            .checked_mul(protocol.sol_price_usd_6dec as u128)
             .ok_or(ErrorCode::MathOverflow)?
             .checked_div(1_000_000_000)
             .ok_or(ErrorCode::MathOverflow)?;
         
-        if collateral_value_usd == 0 {
-            return err!(ErrorCode::NoCollateral);
-        }
+        require!(collateral_value > 0, ErrorCode::NoCollateral);
         
-        let current_ltv_bps = (position.borrowed_amount as u128)
+        let current_ltv = (position.borrowed_amount as u128)
             .checked_mul(10000)
             .ok_or(ErrorCode::MathOverflow)?
-            .checked_div(collateral_value_usd)
+            .checked_div(collateral_value)
             .ok_or(ErrorCode::MathOverflow)? as u64;
         
-        // Check if LTV is above GAD start threshold
         let start_ltv = position.gad_config.custom_start_ltv_bps;
-        require!(current_ltv_bps > start_ltv, ErrorCode::LtvBelowGadThreshold);
+        require!(current_ltv > start_ltv, ErrorCode::LtvBelowGadThreshold);
         
-        // Calculate time since last crank
         let now = Clock::get()?.unix_timestamp;
-        let time_elapsed = now.checked_sub(position.last_gad_crank)
-            .ok_or(ErrorCode::MathOverflow)?;
+        let elapsed = now.checked_sub(position.last_gad_crank).ok_or(ErrorCode::MathOverflow)?;
+        require!(elapsed >= 3600, ErrorCode::CrankTooSoon);
         
-        // Minimum 1 hour between cranks to prevent spam
-        require!(time_elapsed >= 3600, ErrorCode::CrankTooSoon);
+        let gad_rate = get_gad_rate_bps(current_ltv, start_ltv);
         
-        // Get GAD rate based on current LTV
-        let gad_rate_bps = get_gad_rate_bps(current_ltv_bps);
-        
-        // Calculate amount to liquidate (proportional to time elapsed)
         let liquidate_amount = (position.collateral_amount as u128)
-            .checked_mul(gad_rate_bps as u128)
+            .checked_mul(gad_rate as u128)
             .ok_or(ErrorCode::MathOverflow)?
-            .checked_mul(time_elapsed as u128)
+            .checked_mul(elapsed as u128)
             .ok_or(ErrorCode::MathOverflow)?
             .checked_div(10000)
             .ok_or(ErrorCode::MathOverflow)?
             .checked_div(SECONDS_PER_DAY as u128)
             .ok_or(ErrorCode::MathOverflow)? as u64;
         
-        // Calculate max liquidatable and actual amount
-        let max_liquidatable = position.collateral_amount
-            .saturating_sub(position.gad_config.min_collateral_floor);
-        let actual_liquidate = std::cmp::min(liquidate_amount, max_liquidatable);
+        let max_liq = position.collateral_amount.saturating_sub(position.gad_config.min_collateral_floor);
+        let actual_liq = std::cmp::min(liquidate_amount, max_liq);
+        require!(actual_liq > 0, ErrorCode::NothingToLiquidate);
         
-        require!(actual_liquidate > 0, ErrorCode::NothingToLiquidate);
-        
-        // Calculate USDC value of liquidated collateral
-        let usdc_value = (actual_liquidate as u128)
-            .checked_mul(sol_price_usd as u128)
+        let usdc_value = (actual_liq as u128)
+            .checked_mul(protocol.sol_price_usd_6dec as u128)
             .ok_or(ErrorCode::MathOverflow)?
             .checked_div(1_000_000_000)
             .ok_or(ErrorCode::MathOverflow)? as u64;
         
-        // Reduce debt by the USDC value
         let debt_reduction = std::cmp::min(usdc_value, position.borrowed_amount);
+        let crank_reward = actual_liq / 200;
+        let total_deduct = actual_liq.checked_add(crank_reward).ok_or(ErrorCode::MathOverflow)?;
         
-        // Calculate crank reward (0.5% of liquidated amount)
-        let crank_reward = actual_liquidate / 200;
-        let total_deduct = actual_liquidate.checked_add(crank_reward).ok_or(ErrorCode::MathOverflow)?;
-        
-        // Build seeds for PDA signing
         let seeds: &[&[u8]] = &[b"vault", position_key.as_ref(), &[vault_bump]];
         
-        // Transfer liquidated SOL to protocol treasury
         invoke_signed(
-            &system_instruction::transfer(
-                ctx.accounts.collateral_vault.key,
-                ctx.accounts.treasury.key,
-                actual_liquidate,
-            ),
+            &system_instruction::transfer(ctx.accounts.collateral_vault.key, ctx.accounts.treasury.key, actual_liq),
             &[
                 ctx.accounts.collateral_vault.to_account_info(),
                 ctx.accounts.treasury.to_account_info(),
@@ -361,14 +520,9 @@ pub mod legasi_credit {
             &[seeds],
         )?;
         
-        // Reward the cranker
         if crank_reward > 0 {
             invoke_signed(
-                &system_instruction::transfer(
-                    ctx.accounts.collateral_vault.key,
-                    ctx.accounts.cranker.key,
-                    crank_reward,
-                ),
+                &system_instruction::transfer(ctx.accounts.collateral_vault.key, ctx.accounts.cranker.key, crank_reward),
                 &[
                     ctx.accounts.collateral_vault.to_account_info(),
                     ctx.accounts.cranker.to_account_info(),
@@ -378,324 +532,234 @@ pub mod legasi_credit {
             )?;
         }
         
-        // Now get mutable references and update state
-        let position_mut = &mut ctx.accounts.position;
-        position_mut.collateral_amount = position_mut.collateral_amount
-            .checked_sub(total_deduct)
-            .ok_or(ErrorCode::MathOverflow)?;
-        position_mut.borrowed_amount = position_mut.borrowed_amount
-            .checked_sub(debt_reduction)
-            .ok_or(ErrorCode::MathOverflow)?;
-        position_mut.last_gad_crank = now;
-        position_mut.total_gad_liquidated = position_mut.total_gad_liquidated
-            .checked_add(actual_liquidate)
-            .ok_or(ErrorCode::MathOverflow)?;
-        position_mut.last_update = now;
+        let position = &mut ctx.accounts.position;
+        position.collateral_amount = position.collateral_amount.saturating_sub(total_deduct);
+        position.borrowed_amount = position.borrowed_amount.saturating_sub(debt_reduction);
+        position.last_gad_crank = now;
+        position.total_gad_liquidated = position.total_gad_liquidated.saturating_add(actual_liq);
+        position.last_update = now;
+        position.reputation.gad_events = position.reputation.gad_events.saturating_add(1);
         
-        // Update protocol stats
-        let protocol_mut = &mut ctx.accounts.protocol;
-        protocol_mut.total_collateral = protocol_mut.total_collateral.saturating_sub(total_deduct);
-        protocol_mut.total_borrowed = protocol_mut.total_borrowed.saturating_sub(debt_reduction);
+        let protocol = &mut ctx.accounts.protocol;
+        protocol.total_collateral = protocol.total_collateral.saturating_sub(total_deduct);
+        protocol.total_borrowed = protocol.total_borrowed.saturating_sub(debt_reduction);
         
-        msg!(
-            "GAD executed: liquidated {} lamports, reduced debt by {} USDC, LTV: {}bps, cranker reward: {}",
-            actual_liquidate,
-            debt_reduction,
-            current_ltv_bps,
-            crank_reward
-        );
-        
-        // Emit event for frontend
         emit!(GadExecuted {
             position: position_key,
-            collateral_liquidated: actual_liquidate,
+            collateral_liquidated: actual_liq,
             debt_reduced: debt_reduction,
-            ltv_before_bps: current_ltv_bps,
+            ltv_bps: current_ltv,
+            gad_rate_bps: gad_rate,
             cranker: cranker_key,
             crank_reward,
         });
         
-        Ok(())
-    }
-
-    /// Get position health and GAD status
-    pub fn get_position_health(ctx: Context<GetPositionHealth>) -> Result<()> {
-        let position = &ctx.accounts.position;
-        let protocol = &ctx.accounts.protocol;
-        
-        let sol_price_usd = protocol.sol_price_usd_6dec;
-        
-        let collateral_value_usd = (position.collateral_amount as u128)
-            .checked_mul(sol_price_usd as u128)
-            .ok_or(ErrorCode::MathOverflow)?
-            .checked_div(1_000_000_000)
-            .ok_or(ErrorCode::MathOverflow)? as u64;
-        
-        let current_ltv_bps = if collateral_value_usd > 0 {
-            (position.borrowed_amount as u128)
-                .checked_mul(10000)
-                .ok_or(ErrorCode::MathOverflow)?
-                .checked_div(collateral_value_usd as u128)
-                .ok_or(ErrorCode::MathOverflow)? as u64
-        } else {
-            0
-        };
-        
-        let gad_rate_bps = get_gad_rate_bps(current_ltv_bps);
-        let is_gad_active = position.gad_config.enabled && current_ltv_bps > position.gad_config.custom_start_ltv_bps;
-        
-        // Calculate time to full liquidation at current rate
-        let seconds_to_full_liquidation = if gad_rate_bps > 0 && position.collateral_amount > 0 {
-            let liquidatable = position.collateral_amount.saturating_sub(position.gad_config.min_collateral_floor);
-            (liquidatable as u128)
-                .checked_mul(10000)
-                .and_then(|v| v.checked_mul(SECONDS_PER_DAY as u128))
-                .and_then(|v| v.checked_div(position.collateral_amount as u128))
-                .and_then(|v| v.checked_div(gad_rate_bps as u128))
-                .unwrap_or(0) as i64
-        } else {
-            -1 // Infinite (no liquidation happening)
-        };
-        
-        emit!(PositionHealth {
-            position: ctx.accounts.position.key(),
-            collateral_amount: position.collateral_amount,
-            borrowed_amount: position.borrowed_amount,
-            collateral_value_usd,
-            current_ltv_bps,
-            gad_rate_bps_per_day: gad_rate_bps,
-            is_gad_active,
-            seconds_to_full_liquidation,
-            sol_price_usd,
-            total_gad_liquidated: position.total_gad_liquidated,
-        });
-        
+        msg!("GAD: liquidated {} lamports", actual_liq);
         Ok(())
     }
 }
 
-// Account structs
+// ========== ACCOUNTS ==========
+
 #[derive(Accounts)]
 pub struct InitializeProtocol<'info> {
-    #[account(
-        init,
-        payer = admin,
-        space = 8 + Protocol::INIT_SPACE,
-        seeds = [b"protocol"],
-        bump
-    )]
+    #[account(init, payer = admin, space = 8 + Protocol::INIT_SPACE, seeds = [b"protocol"], bump)]
     pub protocol: Account<'info, Protocol>,
-    
-    /// CHECK: Treasury account to receive liquidated collateral
+    /// CHECK: Treasury
     pub treasury: UncheckedAccount<'info>,
-    
+    pub usdc_mint: Account<'info, Mint>,
     #[account(mut)]
     pub admin: Signer<'info>,
-    
     pub system_program: Program<'info, System>,
 }
 
 #[derive(Accounts)]
-pub struct UpdatePrice<'info> {
-    #[account(
-        mut,
-        seeds = [b"protocol"],
-        bump = protocol.bump,
-        has_one = admin
-    )]
+pub struct InitializeLp<'info> {
+    #[account(mut, seeds = [b"protocol"], bump = protocol.bump, has_one = admin)]
     pub protocol: Account<'info, Protocol>,
-    
+    #[account(init, payer = admin, mint::decimals = BUSDC_DECIMALS, mint::authority = protocol, seeds = [b"busdc_mint"], bump)]
+    pub busdc_mint: Account<'info, Mint>,
+    #[account(init, payer = admin, token::mint = usdc_mint, token::authority = protocol, seeds = [b"usdc_vault"], bump)]
+    pub usdc_vault: Account<'info, TokenAccount>,
+    pub usdc_mint: Account<'info, Mint>,
+    #[account(mut)]
+    pub admin: Signer<'info>,
+    pub token_program: Program<'info, Token>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct LpDeposit<'info> {
+    #[account(mut, seeds = [b"protocol"], bump = protocol.bump)]
+    pub protocol: Account<'info, Protocol>,
+    #[account(mut, seeds = [b"busdc_mint"], bump)]
+    pub busdc_mint: Account<'info, Mint>,
+    #[account(mut, seeds = [b"usdc_vault"], bump)]
+    pub usdc_vault: Account<'info, TokenAccount>,
+    #[account(mut)]
+    pub user_usdc: Account<'info, TokenAccount>,
+    #[account(mut)]
+    pub user_busdc: Account<'info, TokenAccount>,
+    #[account(mut)]
+    pub depositor: Signer<'info>,
+    pub token_program: Program<'info, Token>,
+}
+
+#[derive(Accounts)]
+pub struct LpWithdraw<'info> {
+    #[account(mut, seeds = [b"protocol"], bump = protocol.bump)]
+    pub protocol: Account<'info, Protocol>,
+    #[account(mut, seeds = [b"busdc_mint"], bump)]
+    pub busdc_mint: Account<'info, Mint>,
+    #[account(mut, seeds = [b"usdc_vault"], bump)]
+    pub usdc_vault: Account<'info, TokenAccount>,
+    #[account(mut)]
+    pub user_usdc: Account<'info, TokenAccount>,
+    #[account(mut)]
+    pub user_busdc: Account<'info, TokenAccount>,
+    #[account(mut)]
+    pub withdrawer: Signer<'info>,
+    pub token_program: Program<'info, Token>,
+}
+
+#[derive(Accounts)]
+pub struct UpdatePrice<'info> {
+    #[account(mut, seeds = [b"protocol"], bump = protocol.bump, has_one = admin)]
+    pub protocol: Account<'info, Protocol>,
     pub admin: Signer<'info>,
 }
 
 #[derive(Accounts)]
 pub struct InitializePosition<'info> {
-    #[account(
-        init,
-        payer = owner,
-        space = 8 + Position::INIT_SPACE,
-        seeds = [b"position", owner.key().as_ref()],
-        bump
-    )]
+    #[account(init, payer = owner, space = 8 + Position::INIT_SPACE, seeds = [b"position", owner.key().as_ref()], bump)]
     pub position: Account<'info, Position>,
-    
     #[account(mut)]
     pub owner: Signer<'info>,
-    
     pub system_program: Program<'info, System>,
 }
 
 #[derive(Accounts)]
 pub struct ConfigureGad<'info> {
-    #[account(
-        mut,
-        seeds = [b"position", owner.key().as_ref()],
-        bump = position.bump,
-        has_one = owner
-    )]
+    #[account(mut, seeds = [b"position", owner.key().as_ref()], bump = position.bump, has_one = owner)]
     pub position: Account<'info, Position>,
-    
     pub owner: Signer<'info>,
 }
 
 #[derive(Accounts)]
 pub struct DepositCollateral<'info> {
-    #[account(
-        mut,
-        seeds = [b"position", owner.key().as_ref()],
-        bump = position.bump,
-        has_one = owner
-    )]
+    #[account(mut, seeds = [b"position", owner.key().as_ref()], bump = position.bump, has_one = owner)]
     pub position: Account<'info, Position>,
-    
-    #[account(
-        mut,
-        seeds = [b"protocol"],
-        bump = protocol.bump
-    )]
+    #[account(mut, seeds = [b"protocol"], bump = protocol.bump)]
     pub protocol: Account<'info, Protocol>,
-    
-    /// CHECK: PDA vault for collateral
-    #[account(
-        mut,
-        seeds = [b"vault", position.key().as_ref()],
-        bump
-    )]
+    /// CHECK: PDA vault
+    #[account(mut, seeds = [b"vault", position.key().as_ref()], bump)]
     pub collateral_vault: UncheckedAccount<'info>,
-    
     #[account(mut)]
     pub owner: Signer<'info>,
-    
     pub system_program: Program<'info, System>,
 }
 
 #[derive(Accounts)]
-pub struct Borrow<'info> {
-    #[account(
-        mut,
-        seeds = [b"position", owner.key().as_ref()],
-        bump = position.bump,
-        has_one = owner
-    )]
+pub struct BorrowUsdc<'info> {
+    #[account(mut, seeds = [b"position", owner.key().as_ref()], bump = position.bump, has_one = owner)]
     pub position: Account<'info, Position>,
-    
-    #[account(
-        mut,
-        seeds = [b"protocol"],
-        bump = protocol.bump
-    )]
+    #[account(mut, seeds = [b"protocol"], bump = protocol.bump)]
     pub protocol: Account<'info, Protocol>,
-    
+    #[account(mut, seeds = [b"usdc_vault"], bump)]
+    pub usdc_vault: Account<'info, TokenAccount>,
+    #[account(mut)]
+    pub user_usdc: Account<'info, TokenAccount>,
     pub owner: Signer<'info>,
+    pub token_program: Program<'info, Token>,
 }
 
 #[derive(Accounts)]
-pub struct Repay<'info> {
-    #[account(
-        mut,
-        seeds = [b"position", owner.key().as_ref()],
-        bump = position.bump,
-        has_one = owner
-    )]
+pub struct RepayUsdc<'info> {
+    #[account(mut, seeds = [b"position", owner.key().as_ref()], bump = position.bump, has_one = owner)]
     pub position: Account<'info, Position>,
-    
-    #[account(
-        mut,
-        seeds = [b"protocol"],
-        bump = protocol.bump
-    )]
+    #[account(mut, seeds = [b"protocol"], bump = protocol.bump)]
     pub protocol: Account<'info, Protocol>,
-    
+    #[account(mut, seeds = [b"usdc_vault"], bump)]
+    pub usdc_vault: Account<'info, TokenAccount>,
+    #[account(mut)]
+    pub user_usdc: Account<'info, TokenAccount>,
+    #[account(mut)]
     pub owner: Signer<'info>,
+    pub token_program: Program<'info, Token>,
 }
 
 #[derive(Accounts)]
 pub struct WithdrawCollateral<'info> {
-    #[account(
-        mut,
-        seeds = [b"position", owner.key().as_ref()],
-        bump = position.bump,
-        has_one = owner
-    )]
+    #[account(mut, seeds = [b"position", owner.key().as_ref()], bump = position.bump, has_one = owner)]
     pub position: Account<'info, Position>,
-    
-    #[account(
-        seeds = [b"protocol"],
-        bump = protocol.bump
-    )]
+    #[account(seeds = [b"protocol"], bump = protocol.bump)]
     pub protocol: Account<'info, Protocol>,
-    
     /// CHECK: PDA vault
-    #[account(
-        mut,
-        seeds = [b"vault", position.key().as_ref()],
-        bump
-    )]
+    #[account(mut, seeds = [b"vault", position.key().as_ref()], bump)]
     pub collateral_vault: UncheckedAccount<'info>,
-    
     #[account(mut)]
     pub owner: Signer<'info>,
-    
     pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct FlashLoan<'info> {
+    #[account(seeds = [b"protocol"], bump = protocol.bump)]
+    pub protocol: Account<'info, Protocol>,
+    #[account(mut, seeds = [b"usdc_vault"], bump)]
+    pub usdc_vault: Account<'info, TokenAccount>,
+    #[account(mut)]
+    pub user_usdc: Account<'info, TokenAccount>,
+    pub borrower: Signer<'info>,
+    pub token_program: Program<'info, Token>,
+}
+
+#[derive(Accounts)]
+pub struct RepayFlashLoan<'info> {
+    #[account(mut, seeds = [b"protocol"], bump = protocol.bump)]
+    pub protocol: Account<'info, Protocol>,
+    #[account(mut, seeds = [b"usdc_vault"], bump)]
+    pub usdc_vault: Account<'info, TokenAccount>,
+    #[account(mut)]
+    pub user_usdc: Account<'info, TokenAccount>,
+    pub borrower: Signer<'info>,
+    pub token_program: Program<'info, Token>,
 }
 
 #[derive(Accounts)]
 pub struct CrankGad<'info> {
-    #[account(
-        mut,
-        seeds = [b"position", position.owner.as_ref()],
-        bump = position.bump
-    )]
+    #[account(mut, seeds = [b"position", position.owner.as_ref()], bump = position.bump)]
     pub position: Account<'info, Position>,
-    
-    #[account(
-        mut,
-        seeds = [b"protocol"],
-        bump = protocol.bump,
-        has_one = treasury
-    )]
+    #[account(mut, seeds = [b"protocol"], bump = protocol.bump, has_one = treasury)]
     pub protocol: Account<'info, Protocol>,
-    
     /// CHECK: PDA vault
-    #[account(
-        mut,
-        seeds = [b"vault", position.key().as_ref()],
-        bump
-    )]
+    #[account(mut, seeds = [b"vault", position.key().as_ref()], bump)]
     pub collateral_vault: UncheckedAccount<'info>,
-    
-    /// CHECK: Protocol treasury
+    /// CHECK: Treasury
     #[account(mut)]
     pub treasury: UncheckedAccount<'info>,
-    
-    /// Cranker receives reward
     #[account(mut)]
     pub cranker: Signer<'info>,
-    
     pub system_program: Program<'info, System>,
 }
 
-#[derive(Accounts)]
-pub struct GetPositionHealth<'info> {
-    pub position: Account<'info, Position>,
-    
-    #[account(
-        seeds = [b"protocol"],
-        bump = protocol.bump
-    )]
-    pub protocol: Account<'info, Protocol>,
-}
+// ========== DATA ==========
 
-// Data structs
 #[account]
 #[derive(InitSpace)]
 pub struct Protocol {
     pub admin: Pubkey,
-    pub sol_price_usd_6dec: u64, // SOL price in USD with 6 decimals
+    pub sol_price_usd_6dec: u64,
     pub last_price_update: i64,
     pub total_collateral: u64,
     pub total_borrowed: u64,
     pub treasury: Pubkey,
+    pub usdc_mint: Pubkey,
+    pub busdc_mint: Pubkey,
+    pub total_lp_deposits: u64,
+    pub total_lp_shares: u64,
+    pub insurance_fund: u64,
+    pub total_interest_earned: u64,
     pub bump: u8,
 }
 
@@ -709,50 +773,89 @@ pub struct Position {
     pub last_gad_crank: i64,
     pub gad_config: GadConfig,
     pub total_gad_liquidated: u64,
+    pub reputation: Reputation,
     pub bump: u8,
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, InitSpace)]
 pub struct GadConfig {
     pub enabled: bool,
-    pub custom_start_ltv_bps: u64, // Default 5000 (50%)
-    pub min_collateral_floor: u64, // User-defined minimum collateral
+    pub custom_start_ltv_bps: u64,
+    pub min_collateral_floor: u64,
 }
 
 impl Default for GadConfig {
     fn default() -> Self {
-        Self {
-            enabled: true, // GAD enabled by default for safety
-            custom_start_ltv_bps: GAD_START_LTV_BPS,
-            min_collateral_floor: 0,
+        Self { enabled: true, custom_start_ltv_bps: GAD_START_LTV_BPS, min_collateral_floor: 0 }
+    }
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, InitSpace, Default)]
+pub struct Reputation {
+    pub successful_repayments: u32,
+    pub total_repaid: u64,
+    pub gad_events: u32,
+    pub account_created: i64,
+}
+
+impl Reputation {
+    pub fn get_score(&self) -> u32 {
+        let base = std::cmp::min(self.successful_repayments * 50, 500);
+        base.saturating_sub(self.gad_events * 100)
+    }
+    
+    pub fn get_ltv_bonus_bps(&self) -> u64 {
+        match self.get_score() {
+            s if s >= 400 => 1500,
+            s if s >= 200 => 1000,
+            s if s >= 100 => 500,
+            _ => 0,
         }
     }
 }
 
-// Events
+// ========== EVENTS ==========
+
 #[event]
 pub struct GadExecuted {
     pub position: Pubkey,
     pub collateral_liquidated: u64,
     pub debt_reduced: u64,
-    pub ltv_before_bps: u64,
+    pub ltv_bps: u64,
+    pub gad_rate_bps: u64,
     pub cranker: Pubkey,
     pub crank_reward: u64,
 }
 
 #[event]
-pub struct PositionHealth {
-    pub position: Pubkey,
-    pub collateral_amount: u64,
-    pub borrowed_amount: u64,
-    pub collateral_value_usd: u64,
-    pub current_ltv_bps: u64,
-    pub gad_rate_bps_per_day: u64,
-    pub is_gad_active: bool,
-    pub seconds_to_full_liquidation: i64,
-    pub sol_price_usd: u64,
-    pub total_gad_liquidated: u64,
+pub struct LpDepositEvent {
+    pub depositor: Pubkey,
+    pub usdc_amount: u64,
+    pub shares_minted: u64,
 }
+
+#[event]
+pub struct LpWithdrawEvent {
+    pub withdrawer: Pubkey,
+    pub shares_burned: u64,
+    pub usdc_received: u64,
+}
+
+#[event]
+pub struct FlashLoanInitiated {
+    pub borrower: Pubkey,
+    pub amount: u64,
+    pub fee: u64,
+}
+
+#[event]
+pub struct FlashLoanRepaid {
+    pub borrower: Pubkey,
+    pub amount: u64,
+    pub fee: u64,
+}
+
+// ========== ERRORS ==========
 
 #[error_code]
 pub enum ErrorCode {
@@ -760,24 +863,28 @@ pub enum ErrorCode {
     InvalidAmount,
     #[msg("Math overflow")]
     MathOverflow,
-    #[msg("Exceeds maximum LTV (50%)")]
+    #[msg("Exceeds maximum LTV")]
     ExceedsLTV,
     #[msg("Insufficient collateral")]
     InsufficientCollateral,
-    #[msg("GAD is disabled for this position")]
+    #[msg("Insufficient liquidity")]
+    InsufficientLiquidity,
+    #[msg("GAD disabled")]
     GadDisabled,
     #[msg("No debt to deleverage")]
     NoDebtToDeleverage,
-    #[msg("No collateral in position")]
+    #[msg("No collateral")]
     NoCollateral,
-    #[msg("LTV is below GAD threshold")]
+    #[msg("LTV below GAD threshold")]
     LtvBelowGadThreshold,
-    #[msg("Crank called too soon (min 1 hour)")]
+    #[msg("Crank too soon")]
     CrankTooSoon,
     #[msg("Nothing to liquidate")]
     NothingToLiquidate,
-    #[msg("Withdrawal would go below collateral floor")]
+    #[msg("Below collateral floor")]
     BelowCollateralFloor,
-    #[msg("Invalid GAD configuration")]
+    #[msg("Invalid GAD config")]
     InvalidGadConfig,
+    #[msg("No LP shares")]
+    NoLpShares,
 }
