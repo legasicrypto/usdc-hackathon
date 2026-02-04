@@ -116,7 +116,7 @@ export default function Home() {
 
             {/* Jupiter Logo */}
             <div className="flex items-center gap-3 text-[#5a5a5a] hover:text-[#8a8a8a] transition">
-              <img src="https://avatars.githubusercontent.com/u/90479116?s=64" alt="Jupiter" className="w-7 h-7 rounded" />
+              <img src="/jupiter-logo.svg" alt="Jupiter" className="w-7 h-7" />
               <span className="text-sm font-medium">Jupiter</span>
             </div>
           </div>
