@@ -7,12 +7,14 @@ pub mod errors;
 pub mod constants;
 pub mod events;
 pub mod interest;
+pub mod pyth;
 
 pub use state::*;
 pub use errors::*;
 pub use constants::*;
 pub use events::*;
 pub use interest::*;
+pub use pyth::*;
 
 #[program]
 pub mod legasi_core {
@@ -102,7 +104,7 @@ pub mod legasi_core {
         Ok(())
     }
 
-    /// Update price (admin only - will use Pyth in prod)
+    /// Update price (admin only - for testing/fallback)
     pub fn update_price(
         ctx: Context<UpdatePrice>,
         price_usd: u64,
@@ -112,6 +114,37 @@ pub mod legasi_core {
         price_feed.last_update = Clock::get()?.unix_timestamp;
         
         msg!("Price updated to ${}", price_usd as f64 / 1_000_000.0);
+        Ok(())
+    }
+
+    /// Sync price from Pyth oracle (permissionless)
+    pub fn sync_pyth_price(ctx: Context<SyncPythPrice>) -> Result<()> {
+        let pyth_data = ctx.accounts.pyth_price_account.try_borrow_data()?;
+        
+        let pyth_price = parse_pyth_price(&pyth_data)
+            .ok_or(LegasiError::InvalidOracle)?;
+        
+        let now = Clock::get()?.unix_timestamp;
+        
+        // Check price is not stale
+        require!(
+            !pyth_price.is_stale(now, MAX_PRICE_AGE),
+            LegasiError::StalePriceFeed
+        );
+        
+        // Check confidence is acceptable
+        require!(
+            pyth_price.confidence_bps() <= MAX_CONFIDENCE_BPS,
+            LegasiError::InvalidOracle
+        );
+        
+        // Update our price feed
+        let price_feed = &mut ctx.accounts.price_feed;
+        price_feed.price_usd_6dec = pyth_price.to_usd_6dec();
+        price_feed.confidence = pyth_price.conf;
+        price_feed.last_update = now;
+        
+        msg!("Synced Pyth price: ${}", price_feed.price_usd_6dec as f64 / 1_000_000.0);
         Ok(())
     }
 
@@ -217,4 +250,19 @@ pub struct AdminOnly<'info> {
     #[account(mut, seeds = [b"protocol"], bump = protocol.bump, has_one = admin)]
     pub protocol: Account<'info, Protocol>,
     pub admin: Signer<'info>,
+}
+
+/// Sync price from Pyth oracle (permissionless - anyone can update)
+#[derive(Accounts)]
+pub struct SyncPythPrice<'info> {
+    #[account(
+        mut,
+        seeds = [b"price", mint.key().as_ref()],
+        bump = price_feed.bump
+    )]
+    pub price_feed: Account<'info, PriceFeed>,
+    /// CHECK: Token mint for this price feed
+    pub mint: UncheckedAccount<'info>,
+    /// CHECK: Pyth price account - verified by parsing
+    pub pyth_price_account: UncheckedAccount<'info>,
 }
