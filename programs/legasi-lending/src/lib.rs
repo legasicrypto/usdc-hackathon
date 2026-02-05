@@ -2,9 +2,9 @@ use anchor_lang::prelude::*;
 use anchor_lang::solana_program::program::invoke;
 use anchor_lang::solana_program::program::invoke_signed;
 use anchor_lang::solana_program::system_instruction;
-use anchor_spl::token::{self, Token, TokenAccount, Transfer, Mint};
+use anchor_spl::token::{self, Mint, Token, TokenAccount, Transfer};
 
-use legasi_core::{state::*, errors::LegasiError, constants::*};
+use legasi_core::{constants::*, errors::LegasiError, state::*};
 
 pub mod x402;
 pub use x402::*;
@@ -50,19 +50,25 @@ pub mod legasi_lending {
         )?;
 
         let position = &mut ctx.accounts.position;
-        
+
         // Find or create SOL deposit
         let mut found = false;
         for deposit in position.collaterals.iter_mut() {
             if deposit.asset_type == AssetType::SOL {
-                deposit.amount = deposit.amount.checked_add(amount).ok_or(LegasiError::MathOverflow)?;
+                deposit.amount = deposit
+                    .amount
+                    .checked_add(amount)
+                    .ok_or(LegasiError::MathOverflow)?;
                 found = true;
                 break;
             }
         }
-        
+
         if !found {
-            require!(position.collaterals.len() < MAX_COLLATERAL_TYPES, LegasiError::MaxCollateralTypesReached);
+            require!(
+                position.collaterals.len() < MAX_COLLATERAL_TYPES,
+                LegasiError::MaxCollateralTypesReached
+            );
             position.collaterals.push(CollateralDeposit {
                 asset_type: AssetType::SOL,
                 amount,
@@ -77,7 +83,10 @@ pub mod legasi_lending {
     /// Deposit SPL token as collateral (cbBTC)
     pub fn deposit_token(ctx: Context<DepositToken>, amount: u64) -> Result<()> {
         require!(amount > 0, LegasiError::InvalidAmount);
-        require!(ctx.accounts.collateral_config.is_active, LegasiError::AssetNotActive);
+        require!(
+            ctx.accounts.collateral_config.is_active,
+            LegasiError::AssetNotActive
+        );
 
         let asset_type = ctx.accounts.collateral_config.asset_type;
 
@@ -94,28 +103,34 @@ pub mod legasi_lending {
         )?;
 
         let position = &mut ctx.accounts.position;
-        
+
         let mut found = false;
         for deposit in position.collaterals.iter_mut() {
             if deposit.asset_type == asset_type {
-                deposit.amount = deposit.amount.checked_add(amount).ok_or(LegasiError::MathOverflow)?;
+                deposit.amount = deposit
+                    .amount
+                    .checked_add(amount)
+                    .ok_or(LegasiError::MathOverflow)?;
                 found = true;
                 break;
             }
         }
 
         if !found {
-            require!(position.collaterals.len() < MAX_COLLATERAL_TYPES, LegasiError::MaxCollateralTypesReached);
-            position.collaterals.push(CollateralDeposit {
-                asset_type,
-                amount,
-            });
+            require!(
+                position.collaterals.len() < MAX_COLLATERAL_TYPES,
+                LegasiError::MaxCollateralTypesReached
+            );
+            position
+                .collaterals
+                .push(CollateralDeposit { asset_type, amount });
         }
 
         position.last_update = Clock::get()?.unix_timestamp;
 
         let collateral_config = &mut ctx.accounts.collateral_config;
-        collateral_config.total_deposited = collateral_config.total_deposited
+        collateral_config.total_deposited = collateral_config
+            .total_deposited
             .checked_add(amount)
             .ok_or(LegasiError::MathOverflow)?;
 
@@ -126,8 +141,14 @@ pub mod legasi_lending {
     /// Borrow stablecoins (USDC, EURC)
     pub fn borrow(ctx: Context<Borrow>, amount: u64) -> Result<()> {
         require!(amount > 0, LegasiError::InvalidAmount);
-        require!(ctx.accounts.borrowable_config.is_active, LegasiError::AssetNotActive);
-        require!(ctx.accounts.borrow_vault.amount >= amount, LegasiError::InsufficientLiquidity);
+        require!(
+            ctx.accounts.borrowable_config.is_active,
+            LegasiError::AssetNotActive
+        );
+        require!(
+            ctx.accounts.borrow_vault.amount >= amount,
+            LegasiError::InsufficientLiquidity
+        );
 
         let asset_type = ctx.accounts.borrowable_config.asset_type;
         let sol_price = ctx.accounts.sol_price_feed.price_usd_6dec;
@@ -141,17 +162,26 @@ pub mod legasi_lending {
                     .ok_or(LegasiError::MathOverflow)?
                     .checked_div(LAMPORTS_PER_SOL as u128)
                     .ok_or(LegasiError::MathOverflow)? as u64;
-                total_collateral_usd = total_collateral_usd.checked_add(value).ok_or(LegasiError::MathOverflow)?;
+                total_collateral_usd = total_collateral_usd
+                    .checked_add(value)
+                    .ok_or(LegasiError::MathOverflow)?;
             }
         }
 
-        // Calculate borrow value  
+        // Calculate borrow value
         let mut current_borrow_usd: u64 = 0;
         for borrow in &ctx.accounts.position.borrows {
-            let value = borrow.amount.checked_add(borrow.accrued_interest).ok_or(LegasiError::MathOverflow)?;
-            current_borrow_usd = current_borrow_usd.checked_add(value).ok_or(LegasiError::MathOverflow)?;
+            let value = borrow
+                .amount
+                .checked_add(borrow.accrued_interest)
+                .ok_or(LegasiError::MathOverflow)?;
+            current_borrow_usd = current_borrow_usd
+                .checked_add(value)
+                .ok_or(LegasiError::MathOverflow)?;
         }
-        let new_borrow_usd = current_borrow_usd.checked_add(amount).ok_or(LegasiError::MathOverflow)?;
+        let new_borrow_usd = current_borrow_usd
+            .checked_add(amount)
+            .ok_or(LegasiError::MathOverflow)?;
 
         // Check LTV
         let base_ltv = DEFAULT_SOL_MAX_LTV_BPS as u64;
@@ -185,18 +215,24 @@ pub mod legasi_lending {
 
         // Update position
         let position = &mut ctx.accounts.position;
-        
+
         let mut found = false;
         for borrow in position.borrows.iter_mut() {
             if borrow.asset_type == asset_type {
-                borrow.amount = borrow.amount.checked_add(amount).ok_or(LegasiError::MathOverflow)?;
+                borrow.amount = borrow
+                    .amount
+                    .checked_add(amount)
+                    .ok_or(LegasiError::MathOverflow)?;
                 found = true;
                 break;
             }
         }
 
         if !found {
-            require!(position.borrows.len() < MAX_BORROW_TYPES, LegasiError::MaxBorrowTypesReached);
+            require!(
+                position.borrows.len() < MAX_BORROW_TYPES,
+                LegasiError::MaxBorrowTypesReached
+            );
             position.borrows.push(BorrowedAmount {
                 asset_type,
                 amount,
@@ -219,7 +255,10 @@ pub mod legasi_lending {
         let mut total_owed: u64 = 0;
         for borrow in &ctx.accounts.position.borrows {
             if borrow.asset_type == asset_type {
-                total_owed = borrow.amount.checked_add(borrow.accrued_interest).ok_or(LegasiError::MathOverflow)?;
+                total_owed = borrow
+                    .amount
+                    .checked_add(borrow.accrued_interest)
+                    .ok_or(LegasiError::MathOverflow)?;
                 break;
             }
         }
@@ -241,7 +280,7 @@ pub mod legasi_lending {
 
         // Update position
         let position = &mut ctx.accounts.position;
-        
+
         for borrow in position.borrows.iter_mut() {
             if borrow.asset_type == asset_type {
                 let interest_payment = std::cmp::min(repay_amount, borrow.accrued_interest);
@@ -253,10 +292,16 @@ pub mod legasi_lending {
         }
 
         // Remove empty borrows
-        position.borrows.retain(|b| b.amount > 0 || b.accrued_interest > 0);
+        position
+            .borrows
+            .retain(|b| b.amount > 0 || b.accrued_interest > 0);
 
-        position.reputation.successful_repayments = position.reputation.successful_repayments.saturating_add(1);
-        position.reputation.total_repaid_usd = position.reputation.total_repaid_usd.saturating_add(repay_amount);
+        position.reputation.successful_repayments =
+            position.reputation.successful_repayments.saturating_add(1);
+        position.reputation.total_repaid_usd = position
+            .reputation
+            .total_repaid_usd
+            .saturating_add(repay_amount);
         position.last_update = Clock::get()?.unix_timestamp;
 
         msg!("Repaid {} {:?}", repay_amount, asset_type);
@@ -281,7 +326,9 @@ pub mod legasi_lending {
 
         // Check LTV after withdrawal if has borrows
         if !ctx.accounts.position.borrows.is_empty() {
-            let remaining = sol_amount.checked_sub(amount).ok_or(LegasiError::MathOverflow)?;
+            let remaining = sol_amount
+                .checked_sub(amount)
+                .ok_or(LegasiError::MathOverflow)?;
             let remaining_value = (remaining as u128)
                 .checked_mul(sol_price as u128)
                 .ok_or(LegasiError::MathOverflow)?
@@ -290,8 +337,12 @@ pub mod legasi_lending {
 
             let mut total_borrow: u64 = 0;
             for borrow in &ctx.accounts.position.borrows {
-                total_borrow = total_borrow.checked_add(borrow.amount).ok_or(LegasiError::MathOverflow)?;
-                total_borrow = total_borrow.checked_add(borrow.accrued_interest).ok_or(LegasiError::MathOverflow)?;
+                total_borrow = total_borrow
+                    .checked_add(borrow.amount)
+                    .ok_or(LegasiError::MathOverflow)?;
+                total_borrow = total_borrow
+                    .checked_add(borrow.accrued_interest)
+                    .ok_or(LegasiError::MathOverflow)?;
             }
 
             let max_borrow = remaining_value
@@ -324,7 +375,7 @@ pub mod legasi_lending {
 
         // Update position
         let position = &mut ctx.accounts.position;
-        
+
         for deposit in position.collaterals.iter_mut() {
             if deposit.asset_type == AssetType::SOL {
                 deposit.amount = deposit.amount.saturating_sub(amount);
@@ -344,24 +395,24 @@ pub mod legasi_lending {
         let position = &mut ctx.accounts.position;
         let now = Clock::get()?.unix_timestamp;
         let elapsed = now.saturating_sub(position.last_update);
-        
+
         // Skip if updated recently (< 1 hour)
         if elapsed < 3600 {
             return Ok(());
         }
-        
+
         for borrow in position.borrows.iter_mut() {
             // Get interest rate for this asset (from borrowable config)
             let annual_rate_bps = match borrow.asset_type {
-                AssetType::USDC => 800,  // 8% APR
-                AssetType::EURC => 700,  // 7% APR
+                AssetType::USDC => 800, // 8% APR
+                AssetType::EURC => 700, // 7% APR
                 _ => 0,
             };
-            
+
             if annual_rate_bps == 0 || borrow.amount == 0 {
                 continue;
             }
-            
+
             // Calculate interest: principal * rate * time / year
             // Using seconds: interest = amount * rate_bps * elapsed / (365.25 * 24 * 3600 * 10000)
             let seconds_per_year: u128 = 31_557_600; // 365.25 days
@@ -374,12 +425,12 @@ pub mod legasi_lending {
                 .unwrap_or(0)
                 .checked_div(BPS_DENOMINATOR as u128)
                 .unwrap_or(0) as u64;
-            
+
             borrow.accrued_interest = borrow.accrued_interest.saturating_add(interest);
         }
-        
+
         position.last_update = now;
-        
+
         msg!("Interest accrued for position");
         Ok(())
     }
@@ -388,14 +439,14 @@ pub mod legasi_lending {
     /// Burns the borrowed tokens and initiates fiat transfer
     pub fn offramp_via_bridge(
         ctx: Context<OfframpViaBridge>,
-        request_id: u64,               // Unique request ID for PDA
+        request_id: u64, // Unique request ID for PDA
         amount: u64,
-        destination_iban: String,     // Bank account IBAN
-        destination_name: String,      // Recipient name
+        destination_iban: String, // Bank account IBAN
+        destination_name: String, // Recipient name
     ) -> Result<()> {
         require!(amount > 0, LegasiError::InvalidAmount);
         require!(destination_iban.len() > 10, LegasiError::InvalidAmount); // Basic IBAN validation
-        
+
         // Check user has borrowed this amount
         let position = &ctx.accounts.position;
         let mut borrowed_amount: u64 = 0;
@@ -404,8 +455,11 @@ pub mod legasi_lending {
                 borrowed_amount = borrowed_amount.saturating_add(borrow.amount);
             }
         }
-        require!(borrowed_amount >= amount, LegasiError::InsufficientLiquidity);
-        
+        require!(
+            borrowed_amount >= amount,
+            LegasiError::InsufficientLiquidity
+        );
+
         // Burn tokens from user's account
         token::burn(
             CpiContext::new(
@@ -418,7 +472,7 @@ pub mod legasi_lending {
             ),
             amount,
         )?;
-        
+
         // Create off-ramp request record
         let offramp = &mut ctx.accounts.offramp_request;
         offramp.owner = ctx.accounts.owner.key();
@@ -428,15 +482,19 @@ pub mod legasi_lending {
         offramp.status = OfframpStatus::Pending;
         offramp.created_at = Clock::get()?.unix_timestamp;
         offramp.bump = ctx.bumps.offramp_request;
-        
+
         emit!(OfframpRequested {
             owner: ctx.accounts.owner.key(),
             amount,
             destination_iban,
             asset_type: AssetType::USDC, // TODO: detect from mint
         });
-        
-        msg!("Off-ramp requested: {} USDC to {}", amount, destination_name);
+
+        msg!(
+            "Off-ramp requested: {} USDC to {}",
+            amount,
+            destination_name
+        );
         Ok(())
     }
 
@@ -471,10 +529,10 @@ pub mod legasi_lending {
     /// Can be called by the agent (position owner) autonomously
     pub fn agent_borrow(ctx: Context<AgentBorrow>, amount: u64) -> Result<()> {
         require!(amount > 0, LegasiError::InvalidAmount);
-        
+
         let agent_config = &ctx.accounts.agent_config;
         let now = Clock::get()?.unix_timestamp;
-        
+
         // Check daily limit
         require!(
             agent_config.can_borrow(amount, now),
@@ -483,7 +541,7 @@ pub mod legasi_lending {
 
         // Get price and calculate max borrow (same as regular borrow)
         let sol_price = ctx.accounts.sol_price_feed.price_usd_6dec;
-        
+
         let mut total_collateral_usd: u64 = 0;
         for deposit in &ctx.accounts.position.collaterals {
             if deposit.asset_type == AssetType::SOL || deposit.asset_type == AssetType::CbBTC {
@@ -492,14 +550,21 @@ pub mod legasi_lending {
                     .ok_or(LegasiError::MathOverflow)?
                     .checked_div(LAMPORTS_PER_SOL as u128)
                     .ok_or(LegasiError::MathOverflow)? as u64;
-                total_collateral_usd = total_collateral_usd.checked_add(value).ok_or(LegasiError::MathOverflow)?;
+                total_collateral_usd = total_collateral_usd
+                    .checked_add(value)
+                    .ok_or(LegasiError::MathOverflow)?;
             }
         }
 
         let mut current_borrow_usd: u64 = 0;
         for borrow in &ctx.accounts.position.borrows {
-            let value = borrow.amount.checked_add(borrow.accrued_interest).ok_or(LegasiError::MathOverflow)?;
-            current_borrow_usd = current_borrow_usd.checked_add(value).ok_or(LegasiError::MathOverflow)?;
+            let value = borrow
+                .amount
+                .checked_add(borrow.accrued_interest)
+                .ok_or(LegasiError::MathOverflow)?;
+            current_borrow_usd = current_borrow_usd
+                .checked_add(value)
+                .ok_or(LegasiError::MathOverflow)?;
         }
 
         // Apply reputation bonus to LTV
@@ -513,7 +578,9 @@ pub mod legasi_lending {
             .checked_div(BPS_DENOMINATOR)
             .ok_or(LegasiError::MathOverflow)?;
 
-        let new_total_borrow = current_borrow_usd.checked_add(amount).ok_or(LegasiError::MathOverflow)?;
+        let new_total_borrow = current_borrow_usd
+            .checked_add(amount)
+            .ok_or(LegasiError::MathOverflow)?;
         require!(new_total_borrow <= max_borrow, LegasiError::ExceedsLTV);
 
         // Transfer from vault to agent
@@ -537,17 +604,23 @@ pub mod legasi_lending {
         // Update position
         let position = &mut ctx.accounts.position;
         let asset_type = AssetType::USDC; // Default to USDC for agents
-        
+
         let mut found = false;
         for borrow in position.borrows.iter_mut() {
             if borrow.asset_type == asset_type {
-                borrow.amount = borrow.amount.checked_add(amount).ok_or(LegasiError::MathOverflow)?;
+                borrow.amount = borrow
+                    .amount
+                    .checked_add(amount)
+                    .ok_or(LegasiError::MathOverflow)?;
                 found = true;
                 break;
             }
         }
         if !found {
-            require!(position.borrows.len() < 4, LegasiError::MaxBorrowTypesReached);
+            require!(
+                position.borrows.len() < 4,
+                LegasiError::MaxBorrowTypesReached
+            );
             position.borrows.push(BorrowedAmount {
                 asset_type,
                 amount,
@@ -562,12 +635,17 @@ pub mod legasi_lending {
 
         // Update pool
         let lp_pool = &mut ctx.accounts.lp_pool;
-        lp_pool.total_borrowed = lp_pool.total_borrowed.checked_add(amount).ok_or(LegasiError::MathOverflow)?;
+        lp_pool.total_borrowed = lp_pool
+            .total_borrowed
+            .checked_add(amount)
+            .ok_or(LegasiError::MathOverflow)?;
 
         emit!(AgentBorrowed {
             position: ctx.accounts.position.key(),
             amount,
-            daily_remaining: agent_config.daily_borrow_limit.saturating_sub(agent_config.daily_borrowed),
+            daily_remaining: agent_config
+                .daily_borrow_limit
+                .saturating_sub(agent_config.daily_borrowed),
         });
 
         msg!("Agent borrowed {} USDC", amount);
@@ -577,7 +655,10 @@ pub mod legasi_lending {
     /// Agent auto-repay - automatically repay debt when USDC is received
     pub fn agent_auto_repay(ctx: Context<AgentAutoRepay>, amount: u64) -> Result<()> {
         require!(amount > 0, LegasiError::InvalidAmount);
-        require!(ctx.accounts.agent_config.auto_repay_enabled, LegasiError::Unauthorized);
+        require!(
+            ctx.accounts.agent_config.auto_repay_enabled,
+            LegasiError::Unauthorized
+        );
 
         // Transfer from agent to vault
         token::transfer(
@@ -595,31 +676,42 @@ pub mod legasi_lending {
         // Reduce debt
         let position = &mut ctx.accounts.position;
         let mut remaining = amount;
-        
+
         for borrow in position.borrows.iter_mut() {
-            if remaining == 0 { break; }
-            
+            if remaining == 0 {
+                break;
+            }
+
             // First reduce interest
             let interest_payment = std::cmp::min(remaining, borrow.accrued_interest);
             borrow.accrued_interest = borrow.accrued_interest.saturating_sub(interest_payment);
             remaining = remaining.saturating_sub(interest_payment);
-            
+
             // Then principal
             let principal_payment = std::cmp::min(remaining, borrow.amount);
             borrow.amount = borrow.amount.saturating_sub(principal_payment);
             remaining = remaining.saturating_sub(principal_payment);
         }
 
-        position.borrows.retain(|b| b.amount > 0 || b.accrued_interest > 0);
+        position
+            .borrows
+            .retain(|b| b.amount > 0 || b.accrued_interest > 0);
         position.last_update = Clock::get()?.unix_timestamp;
-        position.reputation.successful_repayments = position.reputation.successful_repayments.saturating_add(1);
-        position.reputation.total_repaid_usd = position.reputation.total_repaid_usd.saturating_add(amount);
+        position.reputation.successful_repayments =
+            position.reputation.successful_repayments.saturating_add(1);
+        position.reputation.total_repaid_usd =
+            position.reputation.total_repaid_usd.saturating_add(amount);
 
         // Update pool
         let lp_pool = &mut ctx.accounts.lp_pool;
-        lp_pool.total_borrowed = lp_pool.total_borrowed.saturating_sub(amount.saturating_sub(remaining));
+        lp_pool.total_borrowed = lp_pool
+            .total_borrowed
+            .saturating_sub(amount.saturating_sub(remaining));
 
-        msg!("Agent auto-repaid {} USDC", amount.saturating_sub(remaining));
+        msg!(
+            "Agent auto-repaid {} USDC",
+            amount.saturating_sub(remaining)
+        );
         Ok(())
     }
 
@@ -630,29 +722,32 @@ pub mod legasi_lending {
     pub fn x402_pay(
         ctx: Context<X402Pay>,
         payment_request: X402PaymentRequest,
-        auto_borrow: bool,  // Borrow if insufficient balance
+        auto_borrow: bool, // Borrow if insufficient balance
     ) -> Result<()> {
         let now = Clock::get()?.unix_timestamp;
-        
+
         // Verify request is valid
         require!(payment_request.is_valid(now), LegasiError::InvalidAmount);
-        require!(ctx.accounts.agent_config.x402_enabled, LegasiError::Unauthorized);
-        
+        require!(
+            ctx.accounts.agent_config.x402_enabled,
+            LegasiError::Unauthorized
+        );
+
         let amount = payment_request.amount;
-        
+
         // Check agent has enough balance
         let agent_balance = ctx.accounts.agent_token_account.amount;
-        
+
         if agent_balance < amount && auto_borrow {
             // Need to borrow the difference
             let borrow_amount = amount.saturating_sub(agent_balance);
-            
+
             // Check daily limit
             require!(
                 ctx.accounts.agent_config.can_borrow(borrow_amount, now),
                 LegasiError::ExceedsLTV
             );
-            
+
             // Borrow from pool
             let pool_bump = ctx.accounts.lp_pool.bump;
             let borrowable_mint = ctx.accounts.lp_pool.borrowable_mint;
@@ -670,15 +765,18 @@ pub mod legasi_lending {
                 ),
                 borrow_amount,
             )?;
-            
+
             // Update position debt
             let position = &mut ctx.accounts.position;
             let asset_type = AssetType::USDC;
-            
+
             let mut found = false;
             for borrow in position.borrows.iter_mut() {
                 if borrow.asset_type == asset_type {
-                    borrow.amount = borrow.amount.checked_add(borrow_amount).ok_or(LegasiError::MathOverflow)?;
+                    borrow.amount = borrow
+                        .amount
+                        .checked_add(borrow_amount)
+                        .ok_or(LegasiError::MathOverflow)?;
                     found = true;
                     break;
                 }
@@ -690,16 +788,19 @@ pub mod legasi_lending {
                     accrued_interest: 0,
                 });
             }
-            
+
             // Update agent config
             let agent_config = &mut ctx.accounts.agent_config;
             agent_config.record_borrow(borrow_amount, now);
-            
+
             // Update pool
             let lp_pool = &mut ctx.accounts.lp_pool;
-            lp_pool.total_borrowed = lp_pool.total_borrowed.checked_add(borrow_amount).ok_or(LegasiError::MathOverflow)?;
+            lp_pool.total_borrowed = lp_pool
+                .total_borrowed
+                .checked_add(borrow_amount)
+                .ok_or(LegasiError::MathOverflow)?;
         }
-        
+
         // Now pay the recipient
         token::transfer(
             CpiContext::new(
@@ -712,7 +813,7 @@ pub mod legasi_lending {
             ),
             amount,
         )?;
-        
+
         // Create receipt
         let receipt = &mut ctx.accounts.receipt;
         receipt.payment_id = payment_request.payment_id;

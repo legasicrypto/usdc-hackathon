@@ -10,19 +10,19 @@ pub const SOL_DECIMALS: u8 = 9;
 pub const LAMPORTS_PER_SOL: u64 = 1_000_000_000;
 
 /// Default max LTV for different asset types (basis points)
-pub const DEFAULT_SOL_MAX_LTV_BPS: u16 = 7500;      // 75%
-pub const DEFAULT_BTC_MAX_LTV_BPS: u16 = 7500;      // 75%
-pub const DEFAULT_JITOSOL_MAX_LTV_BPS: u16 = 8000;  // 80% (correlated to SOL)
+pub const DEFAULT_SOL_MAX_LTV_BPS: u16 = 7500; // 75%
+pub const DEFAULT_BTC_MAX_LTV_BPS: u16 = 7500; // 75%
+pub const DEFAULT_JITOSOL_MAX_LTV_BPS: u16 = 8000; // 80% (correlated to SOL)
 pub const DEFAULT_STABLECOIN_MAX_LTV_BPS: u16 = 9000; // 90%
 
 /// GAD thresholds (basis points above max LTV)
-pub const GAD_SOFT_THRESHOLD_BPS: u16 = 500;   // 5% above max LTV = soft deleverage
-pub const GAD_HARD_THRESHOLD_BPS: u16 = 1500;  // 15% above max LTV = aggressive deleverage
+pub const GAD_SOFT_THRESHOLD_BPS: u16 = 500; // 5% above max LTV = soft deleverage
+pub const GAD_HARD_THRESHOLD_BPS: u16 = 1500; // 15% above max LTV = aggressive deleverage
 
 /// GAD rates (basis points per day)
-pub const GAD_SOFT_RATE_BPS: u64 = 10;     // 0.1% per day
-pub const GAD_MEDIUM_RATE_BPS: u64 = 100;  // 1% per day
-pub const GAD_HARD_RATE_BPS: u64 = 1000;   // 10% per day
+pub const GAD_SOFT_RATE_BPS: u64 = 10; // 0.1% per day
+pub const GAD_MEDIUM_RATE_BPS: u64 = 100; // 1% per day
+pub const GAD_HARD_RATE_BPS: u64 = 1000; // 10% per day
 
 /// Minimum time between GAD cranks (seconds)
 pub const MIN_GAD_CRANK_INTERVAL: i64 = 3600; // 1 hour

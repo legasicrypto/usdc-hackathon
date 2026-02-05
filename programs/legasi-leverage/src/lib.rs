@@ -3,9 +3,7 @@ use anchor_lang::solana_program::program::invoke;
 use anchor_lang::solana_program::system_instruction;
 use anchor_spl::token::{self, Token, TokenAccount, Transfer};
 
-use legasi_core::{
-    state::*, errors::LegasiError, constants::*, events::*,
-};
+use legasi_core::{constants::*, errors::LegasiError, events::*, state::*};
 
 declare_id!("G9iVPMnf4kiRKr59tn1t7m5W4WK2KveFLzANX4bbHtjA");
 
@@ -14,14 +12,14 @@ declare_id!("G9iVPMnf4kiRKr59tn1t7m5W4WK2KveFLzANX4bbHtjA");
 #[derive(InitSpace)]
 pub struct LeveragePosition {
     pub owner: Pubkey,
-    pub position: Pubkey,  // Reference to main Position account
+    pub position: Pubkey, // Reference to main Position account
     pub collateral_type: AssetType,
     pub borrow_type: AssetType,
     pub initial_collateral: u64,
     pub total_collateral: u64,
     pub total_borrowed: u64,
-    pub leverage_multiplier: u8,  // 2x, 3x, 4x, 5x
-    pub entry_price_usd: u64,     // Price when opened
+    pub leverage_multiplier: u8, // 2x, 3x, 4x, 5x
+    pub entry_price_usd: u64,    // Price when opened
     pub is_long: bool,
     pub is_active: bool,
     pub opened_at: i64,
@@ -39,13 +37,16 @@ pub mod legasi_leverage {
         ctx: Context<OpenLong>,
         initial_collateral: u64,
         leverage_multiplier: u8,
-        min_collateral_received: u64,  // Slippage protection
+        min_collateral_received: u64, // Slippage protection
     ) -> Result<()> {
         require!(initial_collateral > 0, LegasiError::InvalidAmount);
-        require!(leverage_multiplier >= 2 && leverage_multiplier <= 5, LegasiError::InvalidAmount);
+        require!(
+            leverage_multiplier >= 2 && leverage_multiplier <= 5,
+            LegasiError::InvalidAmount
+        );
 
         let sol_price = ctx.accounts.sol_price_feed.price_usd_6dec;
-        
+
         // Calculate amounts
         // For 3x leverage: borrow 2x of initial collateral value
         let borrow_multiplier = (leverage_multiplier - 1) as u64;
@@ -54,7 +55,7 @@ pub mod legasi_leverage {
             .ok_or(LegasiError::MathOverflow)?
             .checked_div(LAMPORTS_PER_SOL as u128)
             .ok_or(LegasiError::MathOverflow)? as u64;
-        
+
         let usdc_to_borrow = collateral_value_usd
             .checked_mul(borrow_multiplier)
             .ok_or(LegasiError::MathOverflow)?;
@@ -98,13 +99,16 @@ pub mod legasi_leverage {
 
         // 3. User swaps USDC → SOL off-chain (via Jupiter/Raydium)
         // 4. User deposits additional SOL via deposit_sol instruction
-        
+
         // Calculate expected final collateral (with some buffer for slippage)
         let expected_total_sol = initial_collateral
             .checked_mul(leverage_multiplier as u64)
             .ok_or(LegasiError::MathOverflow)?;
-        
-        require!(expected_total_sol >= min_collateral_received, LegasiError::SlippageExceeded);
+
+        require!(
+            expected_total_sol >= min_collateral_received,
+            LegasiError::SlippageExceeded
+        );
 
         // Initialize leverage position
         let leverage_pos = &mut ctx.accounts.leverage_position;
@@ -124,13 +128,22 @@ pub mod legasi_leverage {
 
         // Update main position
         let position = &mut ctx.accounts.position;
-        
+
         // Add collateral
-        let found = position.collaterals.iter_mut().find(|c| c.asset_type == AssetType::SOL);
+        let found = position
+            .collaterals
+            .iter_mut()
+            .find(|c| c.asset_type == AssetType::SOL);
         if let Some(deposit) = found {
-            deposit.amount = deposit.amount.checked_add(initial_collateral).ok_or(LegasiError::MathOverflow)?;
+            deposit.amount = deposit
+                .amount
+                .checked_add(initial_collateral)
+                .ok_or(LegasiError::MathOverflow)?;
         } else {
-            require!(position.collaterals.len() < MAX_COLLATERAL_TYPES, LegasiError::MaxCollateralTypesReached);
+            require!(
+                position.collaterals.len() < MAX_COLLATERAL_TYPES,
+                LegasiError::MaxCollateralTypesReached
+            );
             position.collaterals.push(CollateralDeposit {
                 asset_type: AssetType::SOL,
                 amount: initial_collateral,
@@ -138,11 +151,20 @@ pub mod legasi_leverage {
         }
 
         // Add borrow
-        let found = position.borrows.iter_mut().find(|b| b.asset_type == AssetType::USDC);
+        let found = position
+            .borrows
+            .iter_mut()
+            .find(|b| b.asset_type == AssetType::USDC);
         if let Some(borrow) = found {
-            borrow.amount = borrow.amount.checked_add(usdc_to_borrow).ok_or(LegasiError::MathOverflow)?;
+            borrow.amount = borrow
+                .amount
+                .checked_add(usdc_to_borrow)
+                .ok_or(LegasiError::MathOverflow)?;
         } else {
-            require!(position.borrows.len() < MAX_BORROW_TYPES, LegasiError::MaxBorrowTypesReached);
+            require!(
+                position.borrows.len() < MAX_BORROW_TYPES,
+                LegasiError::MaxBorrowTypesReached
+            );
             position.borrows.push(BorrowedAmount {
                 asset_type: AssetType::USDC,
                 amount: usdc_to_borrow,
@@ -163,8 +185,9 @@ pub mod legasi_leverage {
             leverage_multiplier,
         });
 
-        msg!("Opened {}x long: {} SOL, borrowed {} USDC", 
-            leverage_multiplier, 
+        msg!(
+            "Opened {}x long: {} SOL, borrowed {} USDC",
+            leverage_multiplier,
             initial_collateral as f64 / LAMPORTS_PER_SOL as f64,
             usdc_to_borrow as f64 / USD_MULTIPLIER as f64
         );
@@ -175,9 +198,9 @@ pub mod legasi_leverage {
     pub fn close_position(ctx: Context<ClosePosition>) -> Result<()> {
         let leverage_pos = &ctx.accounts.leverage_position;
         require!(leverage_pos.is_active, LegasiError::PositionNotFound);
-        
+
         let sol_price = ctx.accounts.sol_price_feed.price_usd_6dec;
-        
+
         // Calculate PnL
         let entry_value_usd = (leverage_pos.total_collateral as u128)
             .checked_mul(leverage_pos.entry_price_usd as u128)
@@ -198,11 +221,16 @@ pub mod legasi_leverage {
 
         // User needs to have USDC to repay
         let position = &ctx.accounts.position;
-        let usdc_borrow = position.borrows.iter()
+        let usdc_borrow = position
+            .borrows
+            .iter()
             .find(|b| b.asset_type == AssetType::USDC)
             .ok_or(LegasiError::PositionNotFound)?;
-        
-        let total_owed = usdc_borrow.amount.checked_add(usdc_borrow.accrued_interest).ok_or(LegasiError::MathOverflow)?;
+
+        let total_owed = usdc_borrow
+            .amount
+            .checked_add(usdc_borrow.accrued_interest)
+            .ok_or(LegasiError::MathOverflow)?;
 
         // Transfer USDC from user to repay
         token::transfer(
@@ -223,8 +251,12 @@ pub mod legasi_leverage {
         position.last_update = Clock::get()?.unix_timestamp;
 
         // Update reputation
-        position.reputation.successful_repayments = position.reputation.successful_repayments.saturating_add(1);
-        position.reputation.total_repaid_usd = position.reputation.total_repaid_usd.saturating_add(total_owed);
+        position.reputation.successful_repayments =
+            position.reputation.successful_repayments.saturating_add(1);
+        position.reputation.total_repaid_usd = position
+            .reputation
+            .total_repaid_usd
+            .saturating_add(total_owed);
 
         // Mark leverage position as closed
         let leverage_pos = &mut ctx.accounts.leverage_position;
@@ -237,7 +269,10 @@ pub mod legasi_leverage {
             pnl_usd,
         });
 
-        msg!("Closed leverage position. PnL: ${}", pnl_usd as f64 / USD_MULTIPLIER as f64);
+        msg!(
+            "Closed leverage position. PnL: ${}",
+            pnl_usd as f64 / USD_MULTIPLIER as f64
+        );
         Ok(())
     }
 
@@ -248,11 +283,17 @@ pub mod legasi_leverage {
     ) -> Result<()> {
         let leverage_pos = &mut ctx.accounts.leverage_position;
         require!(leverage_pos.is_active, LegasiError::PositionNotFound);
-        require!(new_total_collateral >= leverage_pos.initial_collateral, LegasiError::InvalidAmount);
+        require!(
+            new_total_collateral >= leverage_pos.initial_collateral,
+            LegasiError::InvalidAmount
+        );
 
         leverage_pos.total_collateral = new_total_collateral;
 
-        msg!("Updated leverage collateral to {} SOL", new_total_collateral as f64 / LAMPORTS_PER_SOL as f64);
+        msg!(
+            "Updated leverage collateral to {} SOL",
+            new_total_collateral as f64 / LAMPORTS_PER_SOL as f64
+        );
         Ok(())
     }
 }

@@ -1,316 +1,273 @@
-# 🏗️ LEGASI Architecture
+# Legasi Protocol Architecture
+
+> Technical deep-dive into Legasi's modular lending infrastructure for AI agents.
 
 ## Overview
 
-Legasi is a modular lending protocol designed for both humans and AI agents. The architecture separates concerns into 6 specialized programs that work together.
-
-## Program Hierarchy
+Legasi is built as a **modular protocol** with 6 independent programs that compose together:
 
 ```
-                    ┌────────────────────┐
-                    │   legasi-core      │
-                    │   (Foundation)      │
-                    └─────────┬──────────┘
-                              │
-          ┌───────────────────┼───────────────────┐
-          │                   │                   │
-          ▼                   ▼                   ▼
-┌─────────────────┐ ┌─────────────────┐ ┌─────────────────┐
-│ legasi-lending  │ │   legasi-lp     │ │   legasi-gad    │
-│ (User Actions)  │ │ (LP Management) │ │ (Liquidation)   │
-└────────┬────────┘ └─────────────────┘ └─────────────────┘
-         │
-    ┌────┴────┐
-    │         │
-    ▼         ▼
-┌─────────┐ ┌───────────────┐
-│ flash   │ │   leverage    │
-└─────────┘ └───────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│                        LEGASI PROTOCOL                          │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐          │
+│  │ legasi-core  │  │ legasi-lp    │  │ legasi-gad   │          │
+│  │              │  │              │  │              │          │
+│  │ • Protocol   │  │ • LP Pools   │  │ • Gradual    │          │
+│  │   State      │  │ • Deposits   │  │   Auto-      │          │
+│  │ • Collateral │  │ • Withdraws  │  │   Delever-   │          │
+│  │ • Prices     │  │ • Interest   │  │   aging      │          │
+│  │ • Events     │  │              │  │              │          │
+│  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘          │
+│         │                 │                 │                   │
+│         └────────────┬────┴────────┬────────┘                   │
+│                      │             │                            │
+│  ┌──────────────┐    │             │    ┌──────────────┐       │
+│  │legasi-lending│◄───┴─────────────┴───►│legasi-flash  │       │
+│  │              │                       │              │       │
+│  │ • Positions  │                       │ • Flash      │       │
+│  │ • Borrow     │                       │   Loans      │       │
+│  │ • Repay      │                       │ • Arbitrage  │       │
+│  │ • Agent      │                       │              │       │
+│  │   Config     │                       │              │       │
+│  └──────┬───────┘                       └──────────────┘       │
+│         │                                                       │
+│         │    ┌──────────────┐                                   │
+│         └───►│legasi-lever  │                                   │
+│              │              │                                   │
+│              │ • One-click  │                                   │
+│              │   Leverage   │                                   │
+│              │ • Jupiter    │                                   │
+│              │   Swaps      │                                   │
+│              └──────────────┘                                   │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-## Program Details
+## Programs
 
-### 1. legasi-core (Foundation Layer)
+### 1. legasi-core
 
-**Purpose:** Shared state, types, errors, and price oracles.
+**Purpose:** Central state management and configuration.
 
-**Key Components:**
-- `Protocol` - Global protocol settings and admin
-- `Collateral` - Registered collateral types (SOL, cbBTC)
-- `Borrowable` - Registered borrowable assets (USDC, EURC)
-- `PriceFeed` - Oracle price data (Pyth integration)
-
-**State Accounts:**
-```rust
-Protocol {
-    admin: Pubkey,
-    treasury: Pubkey,
-    paused: bool,
-    total_deposits_usd: u64,
-    total_borrows_usd: u64,
-}
-
-PriceFeed {
-    asset_type: AssetType,
-    price_usd_6dec: u64,  // e.g., 150_000_000 = $150
-    confidence: u64,
-    last_update: i64,
-}
-```
-
-### 2. legasi-lending (Core Lending)
-
-**Purpose:** User position management, deposits, borrows, repays.
-
-**Key Components:**
-- `Position` - User's collateral and debt tracking
-- `AgentConfig` - Agent automation settings
-- `OfframpRequest` - Bridge.xyz off-ramp tracking
-
-**State Accounts:**
-```rust
-Position {
-    owner: Pubkey,
-    collaterals: Vec<CollateralDeposit>,  // Max 4 types
-    borrows: Vec<BorrowedAmount>,          // Max 4 types
-    reputation: ReputationScore,
-    gad_enabled: bool,
-    last_update: i64,
-}
-
-AgentConfig {
-    position: Pubkey,
-    operator: Pubkey,
-    daily_borrow_limit: u64,
-    daily_borrowed: u64,
-    period_start: i64,
-    auto_repay_enabled: bool,
-    x402_enabled: bool,
-}
-```
+**Accounts:**
+- `Protocol` - Global protocol state (admin, treasury, pause flag)
+- `Collateral` - Per-asset collateral configuration (LTV, liquidation params)
+- `PriceFeed` - Price oracle data (Pyth integration ready)
 
 **Instructions:**
-| Instruction | Description |
-|-------------|-------------|
-| `initialize_position` | Create user position |
-| `deposit_sol` | Deposit SOL collateral |
-| `deposit_token` | Deposit SPL token collateral |
-| `borrow` | Borrow against collateral |
-| `repay` | Repay debt |
-| `withdraw` | Withdraw collateral |
-| `configure_agent` | Set agent parameters |
-| `agent_borrow` | Agent autonomous borrow |
-| `agent_auto_repay` | Agent automatic repayment |
-| `x402_pay` | Process x402 payment |
+- `initialize_protocol` - One-time setup
+- `register_collateral` - Add new collateral type
+- `update_price` - Update asset price (admin/oracle)
+- `pause/unpause` - Emergency controls
 
-### 3. legasi-lp (Liquidity Pools)
+### 2. legasi-lending
 
-**Purpose:** LP deposits, yield distribution, bToken minting.
+**Purpose:** Core lending operations and agent management.
 
-**State Accounts:**
-```rust
-LpPool {
-    borrowable_mint: Pubkey,   // e.g., USDC
-    lp_token_mint: Pubkey,     // bUSDC
-    total_deposits: u64,
-    total_shares: u64,
-    total_borrowed: u64,
-    interest_earned: u64,
-}
+**Accounts:**
+- `Position` - User's lending position (collateral, debt, reputation)
+- `AgentConfig` - Agent-specific settings (limits, permissions)
+
+**Instructions:**
+- `initialize_position` - Create new position
+- `deposit_sol` / `deposit_spl` - Add collateral
+- `borrow` - Take out loan
+- `repay` - Repay debt
+- `withdraw` - Remove collateral
+- `configure_agent` - Set agent permissions
+
+**Agent Features:**
+- Daily borrow limits
+- Auto-repay configuration
+- x402 payment authorization
+- Alert thresholds
+
+### 3. legasi-lp
+
+**Purpose:** Liquidity provider pools for borrowable assets.
+
+**Accounts:**
+- `LpPool` - Pool state (total deposits, utilization)
+- `LpTokenMint` - LP token mint (receipt tokens)
+- `Vault` - Asset vault (holds deposited tokens)
+
+**Instructions:**
+- `initialize_pool` - Create new LP pool
+- `deposit` - Add liquidity, receive LP tokens
+- `withdraw` - Burn LP tokens, receive assets
+- `accrue_interest` - Update interest accrual
+
+**Interest Model:**
+```
+Utilization = borrowed / total_deposits
+Base Rate = 2%
+Slope 1 = 4% (utilization 0-80%)
+Slope 2 = 75% (utilization 80-100%)
+
+Interest Rate = base + slope1 * min(util, 0.8) + slope2 * max(0, util - 0.8)
 ```
 
-**Share Calculation:**
-```
-shares = (deposit_amount * total_shares) / total_deposits
-withdrawal = (shares * (total_deposits + interest)) / total_shares
-```
+### 4. legasi-gad
 
-### 4. legasi-gad (Gradual Auto-Deleveraging)
+**Purpose:** Gradual Auto-Deleveraging - MEV-resistant liquidation alternative.
 
-**Purpose:** Soft liquidation mechanism that preserves user positions.
+**Accounts:**
+- `GadConfig` - Per-position GAD settings
 
-**Process:**
-```
-1. Monitor: Check all positions for LTV > 77%
-2. Trigger: If over threshold, initiate GAD
-3. Calculate: Determine minimum sell to reach 75% LTV
-4. Swap: Sell collateral via Jupiter for USDC
-5. Repay: Use proceeds to reduce debt
-6. Update: Record GAD event in position
-```
+**Instructions:**
+- `configure_gad` - Enable/configure GAD protection
+- `crank_gad` - Execute gradual deleveraging step
 
-**State Accounts:**
-```rust
-GadConfig {
-    trigger_ltv_bps: u16,     // 7700 = 77%
-    target_ltv_bps: u16,      // 7500 = 75%
-    max_sell_pct_bps: u16,    // 500 = 5% max per crank
-    min_crank_interval: i64,  // Cooldown between cranks
-}
-```
+**How GAD Works:**
+1. User sets `start_threshold` (e.g., 80% LTV)
+2. When LTV exceeds threshold, GAD activates
+3. Each step sells `step_size` % of collateral
+4. Wait `min_interval` between steps
+5. Continue until LTV < threshold
 
-### 5. legasi-flash (Flash Loans)
+**Benefits:**
+- No sudden 100% liquidation
+- User keeps remaining collateral
+- Time to react and add collateral
+- MEV protection (gradual = less profit for bots)
 
-**Purpose:** Uncollateralized loans repaid within same transaction.
+### 5. legasi-flash
 
-**Flow:**
-```
-TX Start
-├── flash_borrow(100,000 USDC)
-│   └── Transfer USDC to borrower
-│   └── Mark flash_active = true
-│
-├── [User's operations]
-│   └── Arbitrage, rebalance, etc.
-│
-├── flash_repay(100,090 USDC)  // +0.09% fee
-│   └── Transfer USDC back
-│   └── Verify amount >= borrowed + fee
-│   └── Mark flash_active = false
-│
-TX End (must complete or revert)
-```
+**Purpose:** Flash loans for composability.
 
-**Safety:**
-- Reentrancy check via `flash_active` flag
-- Amount verification before marking complete
-- Transaction atomicity enforced by Solana runtime
+**Accounts:**
+- `FlashLoan` - Temporary loan state (enforces atomic repayment)
 
-### 6. legasi-leverage (One-Click Leverage)
+**Instructions:**
+- `flash_borrow` - Borrow without collateral
+- `flash_repay` - Repay within same transaction
 
-**Purpose:** Simplified leverage positions using flash loans.
+**Fee:** 0.09% (9 bps)
 
-**3x Long Flow:**
-```
-User Input: 10 SOL
-Target: 3x leverage
+**Use Cases:**
+- Arbitrage
+- Liquidations
+- Collateral swaps
+- Position migrations
 
-Step 1: Deposit 10 SOL
-Step 2: Flash borrow 2000 USDC
-Step 3: Loop (until 3x reached):
-  - Borrow USDC against collateral
-  - Swap USDC → SOL via Jupiter
-  - Deposit SOL as more collateral
-Step 4: Repay flash loan
-Step 5: Position now has ~30 SOL exposure
-```
+### 6. legasi-leverage
 
-## Cross-Program Invocations (CPI)
+**Purpose:** One-click leveraged positions.
 
-```
-┌─────────────┐     CPI      ┌─────────────┐
-│  lending    │ ──────────► │    lp       │
-│             │              │             │
-│ borrow()    │              │ withdraw_   │
-│             │              │ liquidity() │
-└─────────────┘              └─────────────┘
-      │
-      │ CPI
-      ▼
-┌─────────────┐
-│   core      │
-│             │
-│ get_price() │
-└─────────────┘
-```
+**Instructions:**
+- `open_leverage_long` - Leveraged long position
+- `open_leverage_short` - Leveraged short position
+- `close_leverage` - Unwind position
 
-## Account Structure
+**Jupiter Integration:**
+- Best price routing across all Solana DEXs
+- Slippage protection
+- Atomic execution
 
-### PDA Seeds
-
-| Account | Seeds | Program |
-|---------|-------|---------|
-| Protocol | `["protocol"]` | core |
-| Collateral | `["collateral", mint]` | core |
-| PriceFeed | `["price", mint]` | core |
-| Position | `["position", owner]` | lending |
-| AgentConfig | `["agent_config", position]` | lending |
-| LpPool | `["lp_pool", mint]` | lp |
-| LpVault | `["lp_vault", mint]` | lp |
-| LpTokenMint | `["lp_token", mint]` | lp |
-
-## Security Model
+## Security Considerations
 
 ### Access Control
-```
-Admin Operations:
-├── initialize_protocol (admin only)
-├── register_collateral (admin only)
-├── update_price (admin only, fallback)
-└── set_paused (admin only)
+- Admin-only functions protected by signer checks
+- Position operations require owner signature
+- Agent operations require valid AgentConfig
 
-User Operations:
-├── initialize_position (any user)
-├── deposit/withdraw (position owner)
-├── borrow/repay (position owner)
-└── configure_agent (position owner)
+### Overflow Protection
+- All arithmetic uses checked operations
+- BPS calculations use u64 with explicit bounds
+- Price feeds have staleness checks
 
-Permissionless Operations:
-├── sync_pyth_price (anyone)
-├── crank_gad (anyone)
-├── accrue_interest (anyone)
-└── flash_borrow/repay (anyone, atomic)
-```
+### Reentrancy
+- Flash loans use unique PDA per slot
+- State changes before external calls
+- CPI guards on all cross-program calls
 
-### Safety Checks
-1. **Overflow Protection:** All math uses `checked_*` operations
-2. **PDA Validation:** Seeds verified on all account derivations
-3. **Owner Checks:** `has_one = owner` constraints
-4. **Signer Verification:** Required signers for all mutations
-5. **Amount Validation:** Non-zero checks, sufficient balance checks
-6. **Price Staleness:** Pyth prices checked for freshness (60s max)
+### Oracle Security
+- Pyth price feed integration
+- Confidence interval checks
+- Staleness validation
 
-## Interest Rate Model
-
-```
-Utilization = Total Borrowed / Total Deposits
-
-Rate Calculation:
-- If utilization < 80%:
-    rate = base_rate + (utilization * slope1)
-    rate = 2% + (utilization * 10%)
-    
-- If utilization >= 80%:
-    rate = base_rate + (80% * slope1) + ((utilization - 80%) * slope2)
-    rate = 2% + 8% + ((utilization - 80%) * 200%)
-
-Example at 50% utilization: 2% + 5% = 7% APR
-Example at 95% utilization: 2% + 8% + 30% = 40% APR
-```
-
-## Event Emission
-
-All significant actions emit events for indexing:
+## PDA Seeds
 
 ```rust
-#[event]
-pub struct PositionCreated {
-    pub owner: Pubkey,
-    pub position: Pubkey,
-    pub timestamp: i64,
-}
+// Protocol (singleton)
+["protocol"]
 
-#[event]
-pub struct Borrowed {
-    pub position: Pubkey,
-    pub asset: AssetType,
-    pub amount: u64,
-    pub new_ltv_bps: u16,
-}
+// Collateral config per mint
+["collateral", mint.key()]
 
-#[event]
-pub struct GadExecuted {
-    pub position: Pubkey,
-    pub collateral_sold_usd: u64,
-    pub debt_repaid_usd: u64,
-    pub new_ltv_bps: u16,
-}
+// Price feed per mint
+["price", mint.key()]
+
+// User position
+["position", owner.key()]
+
+// Agent config per position
+["agent_config", position.key()]
+
+// GAD config per position
+["gad_config", position.key()]
+
+// LP pool per mint
+["lp_pool", mint.key()]
+
+// LP token mint per pool
+["lp_token", mint.key()]
+
+// Vault per pool
+["lp_vault", mint.key()]
+
+// Flash loan (ephemeral)
+["flash", borrower.key(), slot.to_le_bytes()]
 ```
 
-## Future Extensions
+## Events
 
-1. **Multi-sig Admin:** Replace single admin with Squads multi-sig
-2. **Governance Token:** LEGASI token for protocol governance
-3. **Insurance Fund:** Reserve for bad debt coverage
-4. **Cross-chain:** Wormhole integration for multi-chain collateral
-5. **NFT Collateral:** Support for NFTs with floor price oracles
+All major operations emit events for indexing:
+
+```rust
+// Core
+ProtocolInitialized { admin, treasury }
+CollateralRegistered { mint, max_ltv_bps }
+PriceUpdated { mint, price, timestamp }
+
+// Lending
+PositionCreated { owner, position }
+Deposited { position, mint, amount }
+Borrowed { position, mint, amount }
+Repaid { position, mint, amount }
+Withdrawn { position, mint, amount }
+
+// GAD
+GadConfigured { position, enabled, threshold }
+GadExecuted { position, step, amount_sold, debt_repaid }
+
+// LP
+PoolCreated { mint, pool }
+LpDeposit { pool, depositor, amount, lp_tokens }
+LpWithdraw { pool, withdrawer, amount, lp_tokens }
+
+// Flash
+FlashBorrowed { borrower, mint, amount }
+FlashRepaid { borrower, mint, amount, fee }
+```
+
+## Deployment
+
+### Devnet Addresses
+```
+legasi_core:     4FW9iFaerNuX1GstRKSsWo9UfnTbjtqch3fEHkWMF1Uy
+legasi_lending:  (pending)
+legasi_lp:       CTwY4VSeueesSBc95G38X3WJYPriJEzyxjcCaZAc5LbY
+legasi_gad:      89E84ALdDdGGNuJAxho2H45aC25kqNdGg7QtwTJ3pngK
+legasi_flash:    Fj8CJNK1gBAuNR7dFbKLDckSstKmZn8ihTGwFXxfY93m
+legasi_leverage: (pending)
+```
+
+### Mainnet
+Not yet deployed. Audit required.
+
+## Integration Guide
+
+See [INTEGRATION.md](./INTEGRATION.md) for SDK usage and examples.

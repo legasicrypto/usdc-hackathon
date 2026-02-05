@@ -2,29 +2,26 @@ use anchor_lang::prelude::*;
 
 declare_id!("5Mru5amfomEPqNiEULRuHpgAZyyENqyCeNnkSoh7QjLy");
 
-pub mod state;
-pub mod errors;
 pub mod constants;
+pub mod errors;
 pub mod events;
 pub mod interest;
 pub mod pyth;
+pub mod state;
 
-pub use state::*;
-pub use errors::*;
 pub use constants::*;
+pub use errors::*;
 pub use events::*;
 pub use interest::*;
 pub use pyth::*;
+pub use state::*;
 
 #[program]
 pub mod legasi_core {
     use super::*;
 
     /// Initialize the protocol state
-    pub fn initialize_protocol(
-        ctx: Context<InitializeProtocol>,
-        treasury: Pubkey,
-    ) -> Result<()> {
+    pub fn initialize_protocol(ctx: Context<InitializeProtocol>, treasury: Pubkey) -> Result<()> {
         let protocol = &mut ctx.accounts.protocol;
         protocol.admin = ctx.accounts.admin.key();
         protocol.treasury = treasury;
@@ -33,7 +30,7 @@ pub mod legasi_core {
         protocol.total_borrowed_usd = 0;
         protocol.paused = false;
         protocol.bump = ctx.bumps.protocol;
-        
+
         msg!("Protocol initialized with admin: {}", protocol.admin);
         Ok(())
     }
@@ -59,7 +56,7 @@ pub mod legasi_core {
         collateral.total_deposited = 0;
         collateral.asset_type = asset_type;
         collateral.bump = ctx.bumps.collateral;
-        
+
         msg!("Collateral registered: {:?}", asset_type);
         Ok(())
     }
@@ -82,7 +79,7 @@ pub mod legasi_core {
         borrowable.total_available = 0;
         borrowable.asset_type = asset_type;
         borrowable.bump = ctx.bumps.borrowable;
-        
+
         msg!("Borrowable registered: {:?}", asset_type);
         Ok(())
     }
@@ -99,20 +96,21 @@ pub mod legasi_core {
         price_feed.last_update = Clock::get()?.unix_timestamp;
         price_feed.confidence = 0;
         price_feed.bump = ctx.bumps.price_feed;
-        
-        msg!("Price feed initialized: {:?} = ${}", asset_type, initial_price_usd as f64 / 1_000_000.0);
+
+        msg!(
+            "Price feed initialized: {:?} = ${}",
+            asset_type,
+            initial_price_usd as f64 / 1_000_000.0
+        );
         Ok(())
     }
 
     /// Update price (admin only - for testing/fallback)
-    pub fn update_price(
-        ctx: Context<UpdatePrice>,
-        price_usd: u64,
-    ) -> Result<()> {
+    pub fn update_price(ctx: Context<UpdatePrice>, price_usd: u64) -> Result<()> {
         let price_feed = &mut ctx.accounts.price_feed;
         price_feed.price_usd_6dec = price_usd;
         price_feed.last_update = Clock::get()?.unix_timestamp;
-        
+
         msg!("Price updated to ${}", price_usd as f64 / 1_000_000.0);
         Ok(())
     }
@@ -120,31 +118,33 @@ pub mod legasi_core {
     /// Sync price from Pyth oracle (permissionless)
     pub fn sync_pyth_price(ctx: Context<SyncPythPrice>) -> Result<()> {
         let pyth_data = ctx.accounts.pyth_price_account.try_borrow_data()?;
-        
-        let pyth_price = parse_pyth_price(&pyth_data)
-            .ok_or(LegasiError::InvalidOracle)?;
-        
+
+        let pyth_price = parse_pyth_price(&pyth_data).ok_or(LegasiError::InvalidOracle)?;
+
         let now = Clock::get()?.unix_timestamp;
-        
+
         // Check price is not stale
         require!(
             !pyth_price.is_stale(now, MAX_PRICE_AGE),
             LegasiError::StalePriceFeed
         );
-        
+
         // Check confidence is acceptable
         require!(
             pyth_price.confidence_bps() <= MAX_CONFIDENCE_BPS,
             LegasiError::InvalidOracle
         );
-        
+
         // Update our price feed
         let price_feed = &mut ctx.accounts.price_feed;
         price_feed.price_usd_6dec = pyth_price.to_usd_6dec();
         price_feed.confidence = pyth_price.conf;
         price_feed.last_update = now;
-        
-        msg!("Synced Pyth price: ${}", price_feed.price_usd_6dec as f64 / 1_000_000.0);
+
+        msg!(
+            "Synced Pyth price: ${}",
+            price_feed.price_usd_6dec as f64 / 1_000_000.0
+        );
         Ok(())
     }
 

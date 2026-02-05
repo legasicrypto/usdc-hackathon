@@ -1,5 +1,5 @@
-use anchor_lang::prelude::*;
 use crate::state::AssetType;
+use anchor_lang::prelude::*;
 
 #[event]
 pub struct ProtocolInitialized {

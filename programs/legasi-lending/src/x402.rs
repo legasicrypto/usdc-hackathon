@@ -1,10 +1,10 @@
 use anchor_lang::prelude::*;
 
 /// x402 Payment Protocol Integration
-/// 
+///
 /// x402 is HTTP 402 "Payment Required" - a protocol for machine-to-machine payments.
 /// When an agent receives a 402 response, it needs to pay to access the service.
-/// 
+///
 /// Flow:
 /// 1. Agent calls API → receives 402 with payment details
 /// 2. Agent calls x402_pay with the payment request

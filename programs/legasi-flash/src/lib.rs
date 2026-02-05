@@ -1,9 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, Token, TokenAccount, Transfer};
 
-use legasi_core::{
-    state::*, errors::LegasiError, constants::*, events::*,
-};
+use legasi_core::{constants::*, errors::LegasiError, events::*, state::*};
 
 declare_id!("24zjRceYHjkyP8Nr4bc4q9T7TBbkf292gFocGp6SM5Fz");
 
@@ -27,7 +25,7 @@ pub mod legasi_flash {
     /// Initiate a flash loan - must be repaid in same transaction
     pub fn flash_borrow(ctx: Context<FlashBorrow>, amount: u64, slot: u64) -> Result<()> {
         require!(amount > 0, LegasiError::InvalidAmount);
-        
+
         // Verify slot matches current slot (prevents replay)
         let current_slot = Clock::get()?.slot;
         require!(slot == current_slot, LegasiError::InvalidSlot);
@@ -38,8 +36,11 @@ pub mod legasi_flash {
 
         // Calculate fee (0.05%, minimum 1 token)
         let fee = std::cmp::max(
-            amount.checked_mul(FLASH_LOAN_FEE_BPS).ok_or(LegasiError::MathOverflow)?
-                .checked_div(BPS_DENOMINATOR).ok_or(LegasiError::MathOverflow)?,
+            amount
+                .checked_mul(FLASH_LOAN_FEE_BPS)
+                .ok_or(LegasiError::MathOverflow)?
+                .checked_div(BPS_DENOMINATOR)
+                .ok_or(LegasiError::MathOverflow)?,
             MIN_FLASH_LOAN_FEE,
         );
 
@@ -85,7 +86,7 @@ pub mod legasi_flash {
     /// Repay flash loan + fee - must be in same transaction as borrow
     pub fn flash_repay(ctx: Context<FlashRepay>) -> Result<()> {
         let flash_state = &ctx.accounts.flash_state;
-        
+
         // Verify same slot (same transaction)
         let current_slot = Clock::get()?.slot;
         require!(
@@ -94,7 +95,8 @@ pub mod legasi_flash {
         );
         require!(!flash_state.repaid, LegasiError::FlashLoanNotRepaid);
 
-        let total_repayment = flash_state.amount
+        let total_repayment = flash_state
+            .amount
             .checked_add(flash_state.fee)
             .ok_or(LegasiError::MathOverflow)?;
 
@@ -117,19 +119,29 @@ pub mod legasi_flash {
 
         // Fee goes to LP pool (increases LP token value)
         let lp_pool = &mut ctx.accounts.lp_pool;
-        let insurance_fee = flash_state.fee
+        let insurance_fee = flash_state
+            .fee
             .checked_mul(INSURANCE_FEE_BPS)
             .ok_or(LegasiError::MathOverflow)?
             .checked_div(BPS_DENOMINATOR)
             .ok_or(LegasiError::MathOverflow)?;
-        
+
         let lp_fee = flash_state.fee.saturating_sub(insurance_fee);
-        lp_pool.total_deposits = lp_pool.total_deposits.checked_add(lp_fee).ok_or(LegasiError::MathOverflow)?;
-        lp_pool.interest_earned = lp_pool.interest_earned.checked_add(lp_fee).ok_or(LegasiError::MathOverflow)?;
+        lp_pool.total_deposits = lp_pool
+            .total_deposits
+            .checked_add(lp_fee)
+            .ok_or(LegasiError::MathOverflow)?;
+        lp_pool.interest_earned = lp_pool
+            .interest_earned
+            .checked_add(lp_fee)
+            .ok_or(LegasiError::MathOverflow)?;
 
         // Update protocol insurance
         let protocol = &mut ctx.accounts.protocol;
-        protocol.insurance_fund = protocol.insurance_fund.checked_add(insurance_fee).ok_or(LegasiError::MathOverflow)?;
+        protocol.insurance_fund = protocol
+            .insurance_fund
+            .checked_add(insurance_fee)
+            .ok_or(LegasiError::MathOverflow)?;
 
         emit!(FlashLoanRepaid {
             borrower: ctx.accounts.borrower.key(),
@@ -138,7 +150,11 @@ pub mod legasi_flash {
             fee: flash_state.fee,
         });
 
-        msg!("Flash loan repaid: {} + {} fee", flash_state.amount, flash_state.fee);
+        msg!(
+            "Flash loan repaid: {} + {} fee",
+            flash_state.amount,
+            flash_state.fee
+        );
         Ok(())
     }
 
@@ -146,7 +162,7 @@ pub mod legasi_flash {
     pub fn close_flash_state(ctx: Context<CloseFlashState>) -> Result<()> {
         let flash_state = &ctx.accounts.flash_state;
         require!(flash_state.repaid, LegasiError::FlashLoanNotRepaid);
-        
+
         // Account will be closed automatically via close constraint
         msg!("Flash loan state closed");
         Ok(())

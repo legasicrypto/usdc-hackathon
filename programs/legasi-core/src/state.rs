@@ -7,11 +7,11 @@ use anchor_lang::prelude::*;
 #[repr(u8)]
 pub enum AssetType {
     // Collaterals
-    SOL = 0,      // Native SOL
-    CbBTC = 1,    // Coinbase wrapped BTC
-    // Borrowables  
-    USDC = 2,     // USD Coin
-    EURC = 3,     // Euro Coin
+    SOL = 0,   // Native SOL
+    CbBTC = 1, // Coinbase wrapped BTC
+    // Borrowables
+    USDC = 2, // USD Coin
+    EURC = 3, // Euro Coin
 }
 
 /// Protocol global state
@@ -114,15 +114,16 @@ impl Reputation {
     pub fn get_score(&self) -> u32 {
         let base = std::cmp::min(self.successful_repayments * 50, 500);
         let age_bonus = std::cmp::min(self.account_age_days / 30 * 10, 100);
-        base.saturating_add(age_bonus).saturating_sub(self.gad_events * 100)
+        base.saturating_add(age_bonus)
+            .saturating_sub(self.gad_events * 100)
     }
 
     /// Returns LTV bonus in basis points based on reputation
     pub fn get_ltv_bonus_bps(&self) -> u16 {
         match self.get_score() {
-            s if s >= 400 => 500,  // +5% LTV
-            s if s >= 200 => 300,  // +3% LTV
-            s if s >= 100 => 100,  // +1% LTV
+            s if s >= 400 => 500, // +5% LTV
+            s if s >= 200 => 300, // +3% LTV
+            s if s >= 100 => 100, // +1% LTV
             _ => 0,
         }
     }
@@ -175,10 +176,10 @@ impl AgentConfig {
         if current_time - self.period_start >= seconds_per_day {
             return amount <= self.daily_borrow_limit;
         }
-        
+
         self.daily_borrowed.saturating_add(amount) <= self.daily_borrow_limit
     }
-    
+
     /// Record a borrow against daily limit
     pub fn record_borrow(&mut self, amount: u64, current_time: i64) {
         let seconds_per_day: i64 = 86400;

@@ -1,9 +1,7 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token::{self, Mint, Token, TokenAccount, Transfer, MintTo, Burn};
+use anchor_spl::token::{self, Burn, Mint, MintTo, Token, TokenAccount, Transfer};
 
-use legasi_core::{
-    state::*, errors::LegasiError, constants::*, events::*,
-};
+use legasi_core::{constants::*, errors::LegasiError, events::*, state::*};
 
 declare_id!("4g7FgDLuxXJ7fRa57m8SV3gjznMZ9KUjcdJfg1b6BfPF");
 
@@ -91,8 +89,14 @@ pub mod legasi_lp {
 
         // Update pool state
         let pool = &mut ctx.accounts.lp_pool;
-        pool.total_deposits = pool.total_deposits.checked_add(amount).ok_or(LegasiError::MathOverflow)?;
-        pool.total_shares = pool.total_shares.checked_add(shares_to_mint).ok_or(LegasiError::MathOverflow)?;
+        pool.total_deposits = pool
+            .total_deposits
+            .checked_add(amount)
+            .ok_or(LegasiError::MathOverflow)?;
+        pool.total_shares = pool
+            .total_shares
+            .checked_add(shares_to_mint)
+            .ok_or(LegasiError::MathOverflow)?;
 
         emit!(LpDeposited {
             depositor: ctx.accounts.depositor.key(),
@@ -101,7 +105,11 @@ pub mod legasi_lp {
             shares_minted: shares_to_mint,
         });
 
-        msg!("Deposited {} tokens, received {} LP shares", amount, shares_to_mint);
+        msg!(
+            "Deposited {} tokens, received {} LP shares",
+            amount,
+            shares_to_mint
+        );
         Ok(())
     }
 
@@ -169,7 +177,11 @@ pub mod legasi_lp {
             amount_received: tokens_to_return,
         });
 
-        msg!("Withdrew {} LP shares, received {} tokens", shares_amount, tokens_to_return);
+        msg!(
+            "Withdrew {} LP shares, received {} tokens",
+            shares_amount,
+            tokens_to_return
+        );
         Ok(())
     }
 
@@ -189,22 +201,35 @@ pub mod legasi_lp {
         // Update pool - interest increases total_deposits without changing shares
         // This automatically increases the value of each LP token
         let pool = &mut ctx.accounts.lp_pool;
-        pool.total_deposits = pool.total_deposits.checked_add(lp_interest).ok_or(LegasiError::MathOverflow)?;
-        pool.interest_earned = pool.interest_earned.checked_add(lp_interest).ok_or(LegasiError::MathOverflow)?;
+        pool.total_deposits = pool
+            .total_deposits
+            .checked_add(lp_interest)
+            .ok_or(LegasiError::MathOverflow)?;
+        pool.interest_earned = pool
+            .interest_earned
+            .checked_add(lp_interest)
+            .ok_or(LegasiError::MathOverflow)?;
 
         // Update protocol insurance fund
         let protocol = &mut ctx.accounts.protocol;
-        protocol.insurance_fund = protocol.insurance_fund.checked_add(insurance_fee).ok_or(LegasiError::MathOverflow)?;
+        protocol.insurance_fund = protocol
+            .insurance_fund
+            .checked_add(insurance_fee)
+            .ok_or(LegasiError::MathOverflow)?;
 
-        msg!("Accrued {} interest ({} to LPs, {} to insurance)", 
-            interest_amount, lp_interest, insurance_fee);
+        msg!(
+            "Accrued {} interest ({} to LPs, {} to insurance)",
+            interest_amount,
+            lp_interest,
+            insurance_fee
+        );
         Ok(())
     }
 
     /// Get current exchange rate (tokens per LP share)
     pub fn get_exchange_rate(ctx: Context<GetExchangeRate>) -> Result<u64> {
         let pool = &ctx.accounts.lp_pool;
-        
+
         if pool.total_shares == 0 {
             return Ok(USD_MULTIPLIER); // 1:1 for empty pool
         }
