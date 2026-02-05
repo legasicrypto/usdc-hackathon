@@ -11,6 +11,18 @@
 
 ---
 
+## 🔥 For Judges — One-Liner Start
+
+```bash
+# Open the live app (Phantom wallet on Devnet required)
+open https://agentic.legasi.io/faucet   # 1. Get test tokens
+open https://agentic.legasi.io/dashboard # 2. Deposit SOL → Borrow USDC → See reputation build
+```
+
+**That's it.** Everything is deployed on Solana Devnet. No setup required.
+
+---
+
 ## ⚡ Quick Start (Try it in 2 minutes!)
 
 1. **Get test tokens:** Go to [Faucet](https://agentic.legasi.io/faucet) → Connect Phantom (Devnet) → Claim
@@ -135,16 +147,16 @@ Zero-collateral loans repaid in the same transaction. Perfect for:
 
 ---
 
-## 📦 Programs
+## 📦 Programs (All Deployed ✅)
 
-| Program | Description | Devnet |
-|---------|-------------|--------|
+| Program | Description | Devnet Address |
+|---------|-------------|----------------|
 | `legasi-core` | Protocol state, oracles, identity | `4FW9iFaerNuX1GstRKSsWo9UfnTbjtqch3fEHkWMF1Uy` |
-| `legasi-lending` | Deposit, borrow, repay, agent ops | Deploying... |
+| `legasi-lending` | Deposit, borrow, repay, agent ops | `9356RoSbLTzWE55ab6GktcTocaNhPuBEDZvsmqjkCZYw` |
 | `legasi-gad` | Gradual Auto-Deleveraging | `89E84ALdDdGGNuJAxho2H45aC25kqNdGg7QtwTJ3pngK` |
-| `legasi-lp` | LP pools and yield | Deploying... |
+| `legasi-lp` | LP pools and yield | `CTwY4VSeueesSBc95G38X3WJYPriJEzyxjcCaZAc5LbY` |
 | `legasi-flash` | Flash loans | `Fj8CJNK1gBAuNR7dFbKLDckSstKmZn8ihTGwFXxfY93m` |
-| `legasi-leverage` | One-click leverage | Deploying... |
+| `legasi-leverage` | One-click leverage | `AVATHjGrdQ1KqtjHQ4gwRcuAYjwwScwgPsujLDpiA2g3` |
 
 ---
 
