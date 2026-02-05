@@ -9,11 +9,10 @@ pub const USD_MULTIPLIER: u64 = 1_000_000;
 pub const SOL_DECIMALS: u8 = 9;
 pub const LAMPORTS_PER_SOL: u64 = 1_000_000_000;
 
-/// Default max LTV for different asset types (basis points)
+/// Default max LTV for collateral assets (basis points)
+/// Accepted collaterals: SOL, cbBTC
 pub const DEFAULT_SOL_MAX_LTV_BPS: u16 = 7500; // 75%
 pub const DEFAULT_BTC_MAX_LTV_BPS: u16 = 7500; // 75%
-pub const DEFAULT_JITOSOL_MAX_LTV_BPS: u16 = 8000; // 80% (correlated to SOL)
-pub const DEFAULT_STABLECOIN_MAX_LTV_BPS: u16 = 9000; // 90%
 
 /// GAD thresholds (basis points above max LTV)
 pub const GAD_SOFT_THRESHOLD_BPS: u16 = 500; // 5% above max LTV = soft deleverage
