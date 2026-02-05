@@ -7,6 +7,8 @@
 [![Anchor](https://img.shields.io/badge/Anchor-0.30.1-blue?style=flat-square)](https://anchor-lang.com)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](LICENSE)
 
+> 🎮 **[Live Demo](https://legasi-app.vercel.app)** · 📺 **[Demo Video](#)** · 📊 **[Pitch Deck](docs/PITCH.pdf)**
+
 ---
 
 ## 🤖 Why Agentic Credit?
