@@ -1140,7 +1140,7 @@ pub struct WithdrawSol<'info> {
     /// CHECK: SOL vault PDA
     #[account(mut, seeds = [b"sol_vault", position.key().as_ref()], bump)]
     pub sol_vault: UncheckedAccount<'info>,
-    #[account(seeds = [b"price", sol_mint.key().as_ref()], bump = sol_price_feed.bump)]
+    /// Price feed (owned by core - no seeds validation)
     pub sol_price_feed: Account<'info, PriceFeed>,
     /// CHECK: SOL mint
     pub sol_mint: UncheckedAccount<'info>,
