@@ -14,3 +14,5 @@ sdk/node_modules
 target/
 test-ledger/
 .moltbook
+.vercel
+.env*.local
