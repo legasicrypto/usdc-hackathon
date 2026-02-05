@@ -934,26 +934,22 @@ function Dashboard() {
                         try {
                           const amount = parseFloat(lpAmount);
                           if (lpTab === "deposit") {
-                            setLpPosition(prev => ({
-                              ...prev,
-                              [lpAsset]: prev[lpAsset] + amount
-                            }));
                             if (isDemoMode) {
                               await demoLegasi.lpDeposit(amount, lpAsset);
+                              setLpPosition(prev => ({ ...prev, [lpAsset]: prev[lpAsset] + amount }));
                             } else {
                               console.log("LP Deposit", amount, lpAsset);
                               await realLegasi.lpDeposit(amount, lpAsset);
+                              setLpPosition(prev => ({ ...prev, [lpAsset]: prev[lpAsset] + amount }));
                             }
                           } else {
-                            setLpPosition(prev => ({
-                              ...prev,
-                              [lpAsset]: Math.max(0, prev[lpAsset] - amount)
-                            }));
                             if (isDemoMode) {
                               await demoLegasi.lpWithdraw(amount, lpAsset);
+                              setLpPosition(prev => ({ ...prev, [lpAsset]: Math.max(0, prev[lpAsset] - amount) }));
                             } else {
                               console.log("LP Withdraw", amount, lpAsset);
                               await realLegasi.lpWithdraw(amount, lpAsset);
+                              setLpPosition(prev => ({ ...prev, [lpAsset]: Math.max(0, prev[lpAsset] - amount) }));
                             }
                           }
                           setLpAmount("");

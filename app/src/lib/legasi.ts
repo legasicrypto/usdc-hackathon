@@ -1,6 +1,6 @@
 import { Program, AnchorProvider, BN, Idl } from "@coral-xyz/anchor";
-import { PublicKey, SystemProgram, LAMPORTS_PER_SOL } from "@solana/web3.js";
-import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
+import { PublicKey, SystemProgram, LAMPORTS_PER_SOL, Transaction } from "@solana/web3.js";
+import { TOKEN_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID, createAssociatedTokenAccountInstruction, getAssociatedTokenAddress } from "@solana/spl-token";
 
 // Import IDLs
 import LegasiCoreIDL from "@/idl/legasi_core.json";
@@ -349,7 +349,21 @@ export class LegasiClient {
     )[0];
     
     const userTokenAta = await this.findAta(this.provider.wallet.publicKey, mint);
-    const userLpAta = await this.findAta(this.provider.wallet.publicKey, lpTokenMintPDA);
+    const userLpAta = await getAssociatedTokenAddress(lpTokenMintPDA, this.provider.wallet.publicKey);
+    
+    // Check if LP token account exists, if not add create instruction
+    const preInstructions = [];
+    const lpAccountInfo = await this.provider.connection.getAccountInfo(userLpAta);
+    if (!lpAccountInfo) {
+      preInstructions.push(
+        createAssociatedTokenAccountInstruction(
+          this.provider.wallet.publicKey, // payer
+          userLpAta, // ata
+          this.provider.wallet.publicKey, // owner
+          lpTokenMintPDA // mint
+        )
+      );
+    }
     
     const tokenAmount = new BN(amount * 1_000_000);
     
@@ -364,6 +378,7 @@ export class LegasiClient {
         depositor: this.provider.wallet.publicKey,
         tokenProgram: TOKEN_PROGRAM_ID,
       })
+      .preInstructions(preInstructions)
       .rpc();
     
     return tx;
