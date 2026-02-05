@@ -7,7 +7,7 @@
 [![Anchor](https://img.shields.io/badge/Anchor-0.30.1-blue?style=flat-square)](https://anchor-lang.com)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](LICENSE)
 
-> 🎮 **[Live Demo](https://legasi-app.vercel.app)** · 📺 **[Demo Video](#)** · 📊 **[Pitch Deck](docs/PITCH.pdf)**
+> 🎮 **[Live Demo](https://agentic.legasi.io/dashboard)** · 📺 **[Demo Video](https://youtube.com/watch?v=PENDING)** · 📊 **[Pitch Deck](docs/PITCH.pdf)** · 🚰 **[Devnet Faucet](https://agentic.legasi.io/faucet)**
 
 ---
 
@@ -229,19 +229,41 @@ anchor deploy --provider.cluster devnet
 
 ---
 
+## 🚀 Deployment
+
+**Live on Solana Devnet:**
+
+| Component | Address |
+|-----------|---------|
+| Core | `4FW9iFaerNuX1GstRKSsWo9UfnTbjtqch3fEHkWMF1Uy` |
+| Lending | `9356RoSbLTzWE55ab6GktcTocaNhPuBEDZvsmqjkCZYw` |
+| LP | `CTwY4VSeueesSBc95G38X3WJYPriJEzyxjcCaZAc5LbY` |
+| GAD | `89E84ALdDdGGNuJAxho2H45aC25kqNdGg7QtwTJ3pngK` |
+| Flash | `Fj8CJNK1gBAuNR7dFbKLDckSstKmZn8ihTGwFXxfY93m` |
+| Leverage | `AVATHjGrdQ1KqtjHQ4gwRcuAYjwwScwgPsujLDpiA2g3` |
+
+**Test Tokens:**
+- USDC: `3J2i1X4VGSxkEiHdnq4zead7hiSYbQHs9ZZaS36yAfX8`
+- EURC: `6KeaPv9QA3VYaf62dfDzC785U8Cfa5VbsgtBH5ZWWf7v`
+
+🚰 **[Get test tokens](https://agentic.legasi.io/faucet)**
+
+---
+
 ## 🛣️ Roadmap
 
-### Phase 1: Hackathon (Now)
+### Phase 1: Hackathon ✅
 - [x] Core lending mechanics
 - [x] Agent autonomous borrowing
 - [x] Reputation system
 - [x] x402 payment protocol
 - [x] GAD system
 - [x] Flash loans
-- [ ] Devnet deployment (in progress)
+- [x] Devnet deployment
+- [x] Live frontend
 
 ### Phase 2: Testnet
-- [ ] Multi-collateral support
+- [ ] Multi-collateral support (cbBTC)
 - [ ] Advanced agent permissions
 - [ ] Reputation NFTs
 - [ ] Agent analytics dashboard

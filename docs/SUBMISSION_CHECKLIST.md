@@ -1,7 +1,12 @@
 # Hackathon Submission Checklist
 
 **Deadline:** February 12, 2026
-**Status:** ⏳ Final steps pending (human intervention required)
+**Status:** 🟡 Video pending, then ready to submit
+
+## Live URLs
+- Dashboard: https://agentic.legasi.io/dashboard
+- Faucet: https://agentic.legasi.io/faucet
+- GitHub: https://github.com/legasicrypto/colosseum-agent-hackathon
 
 ---
 

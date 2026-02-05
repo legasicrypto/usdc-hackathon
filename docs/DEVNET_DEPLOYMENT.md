@@ -1,7 +1,35 @@
 # Legasi Protocol - Devnet Deployment Guide
 
-**Status:** Ready for deployment  
-**Last Updated:** 2026-02-04
+**Status:** ✅ DEPLOYED & LIVE  
+**Last Updated:** 2026-02-05
+
+## Live URLs
+
+| Resource | URL |
+|----------|-----|
+| Dashboard | https://agentic.legasi.io/dashboard |
+| Faucet | https://agentic.legasi.io/faucet |
+| Landing | https://agentic.legasi.io |
+
+## Deployed Program IDs
+
+| Program | Address |
+|---------|---------|
+| Core | `4FW9iFaerNuX1GstRKSsWo9UfnTbjtqch3fEHkWMF1Uy` |
+| Lending | `9356RoSbLTzWE55ab6GktcTocaNhPuBEDZvsmqjkCZYw` |
+| LP | `CTwY4VSeueesSBc95G38X3WJYPriJEzyxjcCaZAc5LbY` |
+| GAD | `89E84ALdDdGGNuJAxho2H45aC25kqNdGg7QtwTJ3pngK` |
+| Flash | `Fj8CJNK1gBAuNR7dFbKLDckSstKmZn8ihTGwFXxfY93m` |
+| Leverage | `AVATHjGrdQ1KqtjHQ4gwRcuAYjwwScwgPsujLDpiA2g3` |
+
+## Test Tokens
+
+| Token | Mint |
+|-------|------|
+| USDC | `3J2i1X4VGSxkEiHdnq4zead7hiSYbQHs9ZZaS36yAfX8` |
+| EURC | `6KeaPv9QA3VYaf62dfDzC785U8Cfa5VbsgtBH5ZWWf7v` |
+
+---
 
 ## Prerequisites
 
