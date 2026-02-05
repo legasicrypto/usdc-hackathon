@@ -1,9 +1,50 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, Token, TokenAccount, Transfer};
 
-use legasi_core::{constants::*, errors::LegasiError, events::*, state::*};
+use legasi_core::{constants::*, errors::LegasiError, events::*, state::AssetType};
 
 declare_id!("Fj8CJNK1gBAuNR7dFbKLDckSstKmZn8ihTGwFXxfY93m");
+
+// ========== LOCAL STRUCTS (for cross-program account validation) ==========
+
+/// LP Pool (owned by LP program)
+#[account]
+#[derive(InitSpace)]
+pub struct LpPool {
+    pub borrowable_mint: Pubkey,
+    pub lp_token_mint: Pubkey,
+    pub total_deposits: u64,
+    pub total_shares: u64,
+    pub total_borrowed: u64,
+    pub interest_earned: u64,
+    pub bump: u8,
+}
+
+/// Borrowable config (owned by core program)
+#[account]
+#[derive(InitSpace)]
+pub struct Borrowable {
+    pub mint: Pubkey,
+    pub oracle: Pubkey,
+    pub interest_rate_bps: u16,
+    pub decimals: u8,
+    pub is_active: bool,
+    pub asset_type: AssetType,
+    pub bump: u8,
+}
+
+/// Protocol state (owned by core program)
+#[account]
+#[derive(InitSpace)]
+pub struct Protocol {
+    pub admin: Pubkey,
+    pub treasury: Pubkey,
+    pub insurance_fund: u64,
+    pub total_collateral_usd: u64,
+    pub total_borrowed_usd: u64,
+    pub paused: bool,
+    pub bump: u8,
+}
 
 /// Flash loan state (tracks outstanding loans in a transaction)
 #[account]
@@ -182,22 +223,13 @@ pub struct FlashBorrow<'info> {
         bump
     )]
     pub flash_state: Account<'info, FlashLoanState>,
-    #[account(
-        mut,
-        seeds = [b"lp_pool", borrowable.mint.as_ref()],
-        bump = lp_pool.bump
-    )]
-    pub lp_pool: Account<'info, LpPool>,
-    #[account(
-        seeds = [b"borrowable", borrowable.mint.as_ref()],
-        bump = borrowable.bump
-    )]
-    pub borrowable: Account<'info, Borrowable>,
-    #[account(
-        mut,
-        seeds = [b"lp_vault", borrowable.mint.as_ref()],
-        bump
-    )]
+    /// CHECK: LP Pool (owned by LP program - validated manually)
+    #[account(mut)]
+    pub lp_pool: UncheckedAccount<'info>,
+    /// CHECK: Borrowable config (owned by core program - validated manually)
+    pub borrowable: UncheckedAccount<'info>,
+    /// LP Vault
+    #[account(mut)]
     pub vault: Account<'info, TokenAccount>,
     #[account(mut)]
     pub user_token_account: Account<'info, TokenAccount>,
@@ -216,19 +248,13 @@ pub struct FlashRepay<'info> {
         has_one = borrower
     )]
     pub flash_state: Account<'info, FlashLoanState>,
-    #[account(
-        mut,
-        seeds = [b"lp_pool", lp_pool.borrowable_mint.as_ref()],
-        bump = lp_pool.bump
-    )]
-    pub lp_pool: Account<'info, LpPool>,
-    #[account(mut, seeds = [b"protocol"], bump = protocol.bump)]
-    pub protocol: Account<'info, Protocol>,
-    #[account(
-        mut,
-        seeds = [b"lp_vault", lp_pool.borrowable_mint.as_ref()],
-        bump
-    )]
+    /// CHECK: LP Pool (owned by LP program - validated manually)
+    #[account(mut)]
+    pub lp_pool: UncheckedAccount<'info>,
+    /// CHECK: Protocol (owned by core program - validated manually)
+    pub protocol: UncheckedAccount<'info>,
+    /// LP Vault
+    #[account(mut)]
     pub vault: Account<'info, TokenAccount>,
     #[account(mut)]
     pub user_token_account: Account<'info, TokenAccount>,
