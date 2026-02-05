@@ -1,14 +1,38 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 import { useLegasi } from "@/hooks/useLegasi";
+import { useLegasiDemo } from "@/hooks/useLegasiDemo";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 
-export default function Dashboard() {
+// Wrapper for Suspense boundary
+export default function DashboardPage() {
+  return (
+    <Suspense fallback={<DashboardLoading />}>
+      <Dashboard />
+    </Suspense>
+  );
+}
+
+function DashboardLoading() {
+  return (
+    <div className="min-h-screen bg-[#001520] text-white flex items-center justify-center">
+      <div className="animate-pulse text-[#FF4E00]">Loading...</div>
+    </div>
+  );
+}
+
+function Dashboard() {
   const { connected } = useWallet();
-  const legasi = useLegasi();
+  const searchParams = useSearchParams();
+  const isDemoMode = searchParams.get("demo") === "true";
+  
+  const realLegasi = useLegasi();
+  const demoLegasi = useLegasiDemo();
+  const legasi = isDemoMode ? demoLegasi : realLegasi;
   
   const [depositAmount, setDepositAmount] = useState("");
   const [borrowAmount, setBorrowAmount] = useState("");
@@ -55,6 +79,17 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-[#001520] text-white gradient-bg">
       <Nav />
+      
+      {/* Demo Mode Banner */}
+      {isDemoMode && (
+        <div className="bg-gradient-to-r from-[#FF4E00]/20 to-[#FF8C00]/20 border-b border-[#FF4E00]/30">
+          <div className="max-w-6xl mx-auto px-6 py-3 flex items-center justify-center gap-2">
+            <span className="animate-pulse">🎮</span>
+            <span className="text-[#FF4E00] font-medium text-sm">DEMO MODE</span>
+            <span className="text-[#8a9aa8] text-sm">— Transactions are simulated</span>
+          </div>
+        </div>
+      )}
       
       <div className="max-w-6xl mx-auto px-6 py-8">
         {/* Error */}

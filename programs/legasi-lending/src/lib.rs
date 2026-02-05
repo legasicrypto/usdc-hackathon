@@ -9,7 +9,7 @@ use legasi_core::{constants::*, errors::LegasiError, state::*};
 pub mod x402;
 pub use x402::*;
 
-declare_id!("DGRYqD9Hg9v27Fa9kLUUf3KY9hoprjBQp7y88qG9q88u");
+declare_id!("9356RoSbLTzWE55ab6GktcTocaNhPuBEDZvsmqjkCZYw");
 
 #[program]
 pub mod legasi_lending {

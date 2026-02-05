@@ -6,20 +6,20 @@ resolution = true
 skip-lint = false
 
 [programs.localnet]
-legasi_core = "5Mru5amfomEPqNiEULRuHpgAZyyENqyCeNnkSoh7QjLy"
-legasi_flash = "24zjRceYHjkyP8Nr4bc4q9T7TBbkf292gFocGp6SM5Fz"
-legasi_gad = "Ed7pfvjR1mRWmzHP3r1NvukESGr38xZKwpoQ5jGSAVad"
-legasi_lending = "DGRYqD9Hg9v27Fa9kLUUf3KY9hoprjBQp7y88qG9q88u"
-legasi_leverage = "G9iVPMnf4kiRKr59tn1t7m5W4WK2KveFLzANX4bbHtjA"
-legasi_lp = "4g7FgDLuxXJ7fRa57m8SV3gjznMZ9KUjcdJfg1b6BfPF"
+legasi_core = "4FW9iFaerNuX1GstRKSsWo9UfnTbjtqch3fEHkWMF1Uy"
+legasi_flash = "Fj8CJNK1gBAuNR7dFbKLDckSstKmZn8ihTGwFXxfY93m"
+legasi_gad = "89E84ALdDdGGNuJAxho2H45aC25kqNdGg7QtwTJ3pngK"
+legasi_lending = "9356RoSbLTzWE55ab6GktcTocaNhPuBEDZvsmqjkCZYw"
+legasi_leverage = "AVATHjGrdQ1KqtjHQ4gwRcuAYjwwScwgPsujLDpiA2g3"
+legasi_lp = "CTwY4VSeueesSBc95G38X3WJYPriJEzyxjcCaZAc5LbY"
 
 [programs.devnet]
-legasi_core = "5Mru5amfomEPqNiEULRuHpgAZyyENqyCeNnkSoh7QjLy"
-legasi_flash = "24zjRceYHjkyP8Nr4bc4q9T7TBbkf292gFocGp6SM5Fz"
-legasi_gad = "Ed7pfvjR1mRWmzHP3r1NvukESGr38xZKwpoQ5jGSAVad"
-legasi_lending = "DGRYqD9Hg9v27Fa9kLUUf3KY9hoprjBQp7y88qG9q88u"
-legasi_leverage = "G9iVPMnf4kiRKr59tn1t7m5W4WK2KveFLzANX4bbHtjA"
-legasi_lp = "4g7FgDLuxXJ7fRa57m8SV3gjznMZ9KUjcdJfg1b6BfPF"
+legasi_core = "4FW9iFaerNuX1GstRKSsWo9UfnTbjtqch3fEHkWMF1Uy"
+legasi_flash = "Fj8CJNK1gBAuNR7dFbKLDckSstKmZn8ihTGwFXxfY93m"
+legasi_gad = "89E84ALdDdGGNuJAxho2H45aC25kqNdGg7QtwTJ3pngK"
+legasi_lending = "9356RoSbLTzWE55ab6GktcTocaNhPuBEDZvsmqjkCZYw"
+legasi_leverage = "AVATHjGrdQ1KqtjHQ4gwRcuAYjwwScwgPsujLDpiA2g3"
+legasi_lp = "CTwY4VSeueesSBc95G38X3WJYPriJEzyxjcCaZAc5LbY"
 
 [registry]
 url = "https://api.apr.dev"

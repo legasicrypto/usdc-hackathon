@@ -5,7 +5,7 @@ use anchor_spl::token::{self, Token, TokenAccount, Transfer};
 
 use legasi_core::{constants::*, errors::LegasiError, events::*, state::*};
 
-declare_id!("G9iVPMnf4kiRKr59tn1t7m5W4WK2KveFLzANX4bbHtjA");
+declare_id!("AVATHjGrdQ1KqtjHQ4gwRcuAYjwwScwgPsujLDpiA2g3");
 
 /// Leverage position tracking
 #[account]

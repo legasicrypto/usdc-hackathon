@@ -3,7 +3,7 @@ use anchor_spl::token::{self, Token, TokenAccount, Transfer};
 
 use legasi_core::{constants::*, errors::LegasiError, events::*, state::*};
 
-declare_id!("24zjRceYHjkyP8Nr4bc4q9T7TBbkf292gFocGp6SM5Fz");
+declare_id!("Fj8CJNK1gBAuNR7dFbKLDckSstKmZn8ihTGwFXxfY93m");
 
 /// Flash loan state (tracks outstanding loans in a transaction)
 #[account]

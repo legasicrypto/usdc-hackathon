@@ -3,7 +3,7 @@ use anchor_spl::token::{self, Burn, Mint, MintTo, Token, TokenAccount, Transfer}
 
 use legasi_core::{constants::*, errors::LegasiError, events::*, state::*};
 
-declare_id!("4g7FgDLuxXJ7fRa57m8SV3gjznMZ9KUjcdJfg1b6BfPF");
+declare_id!("CTwY4VSeueesSBc95G38X3WJYPriJEzyxjcCaZAc5LbY");
 
 #[program]
 pub mod legasi_lp {

@@ -5,7 +5,7 @@ use anchor_spl::token::{Token, TokenAccount};
 
 use legasi_core::{constants::*, errors::LegasiError, events::*, state::*};
 
-declare_id!("Ed7pfvjR1mRWmzHP3r1NvukESGr38xZKwpoQ5jGSAVad");
+declare_id!("89E84ALdDdGGNuJAxho2H45aC25kqNdGg7QtwTJ3pngK");
 
 // Jupiter Aggregator v6 Program ID (mainnet)
 // JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4
