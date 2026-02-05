@@ -1599,73 +1599,45 @@
     {
       "name": "AgentConfig",
       "docs": [
-        "Agent-specific position for x402 and autonomous operations",
-        "Extends the base Position with agent-specific features"
+        "Agent configuration for autonomous operations"
       ],
       "type": {
         "kind": "struct",
         "fields": [
           {
             "name": "position",
-            "docs": [
-              "The position this config extends"
-            ],
             "type": "pubkey"
           },
           {
             "name": "operator",
-            "docs": [
-              "Human operator (can intervene if needed)"
-            ],
             "type": "pubkey"
           },
           {
             "name": "daily_borrow_limit",
-            "docs": [
-              "Maximum USDC that can be borrowed per day"
-            ],
             "type": "u64"
           },
           {
             "name": "daily_borrowed",
-            "docs": [
-              "Amount borrowed in current period"
-            ],
             "type": "u64"
           },
           {
             "name": "period_start",
-            "docs": [
-              "Period reset timestamp"
-            ],
             "type": "i64"
           },
           {
             "name": "auto_repay_enabled",
-            "docs": [
-              "Auto-repay incoming USDC to reduce debt"
-            ],
             "type": "bool"
           },
           {
             "name": "x402_enabled",
-            "docs": [
-              "x402 payment endpoint enabled"
-            ],
             "type": "bool"
           },
           {
             "name": "alerts_enabled",
-            "docs": [
-              "Webhook URL for low balance alerts (stored off-chain, this is just a flag)"
-            ],
             "type": "bool"
           },
           {
             "name": "alert_threshold_bps",
-            "docs": [
-              "Minimum collateral ratio before alert (in bps)"
-            ],
             "type": "u16"
           },
           {
@@ -1999,7 +1971,7 @@
     {
       "name": "Position",
       "docs": [
-        "User lending position (multi-collateral, multi-borrow)"
+        "User lending position"
       ],
       "type": {
         "kind": "struct",
@@ -2269,16 +2241,13 @@
     {
       "name": "X402Receipt",
       "docs": [
-        "x402 payment receipt (proof of payment)"
+        "X402 payment receipt"
       ],
       "type": {
         "kind": "struct",
         "fields": [
           {
             "name": "payment_id",
-            "docs": [
-              "The payment request this fulfills"
-            ],
             "type": {
               "array": [
                 "u8",
@@ -2288,37 +2257,22 @@
           },
           {
             "name": "payer",
-            "docs": [
-              "Who paid"
-            ],
             "type": "pubkey"
           },
           {
             "name": "recipient",
-            "docs": [
-              "Who received"
-            ],
             "type": "pubkey"
           },
           {
             "name": "amount",
-            "docs": [
-              "Amount paid"
-            ],
             "type": "u64"
           },
           {
             "name": "paid_at",
-            "docs": [
-              "When paid"
-            ],
             "type": "i64"
           },
           {
             "name": "tx_signature",
-            "docs": [
-              "Transaction signature (for verification)"
-            ],
             "type": {
               "array": [
                 "u8",

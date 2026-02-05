@@ -4,12 +4,131 @@ use anchor_lang::solana_program::program::invoke_signed;
 use anchor_lang::solana_program::system_instruction;
 use anchor_spl::token::{self, Mint, Token, TokenAccount, Transfer};
 
-use legasi_core::{constants::*, errors::LegasiError, state::*};
+// Import only read-only types from core (not Position, AgentConfig, etc. which are init'ed here)
+use legasi_core::{
+    constants::*,
+    errors::LegasiError,
+    state::{Protocol, Borrowable, Collateral, PriceFeed, AssetType, LpPool},
+};
 
 pub mod x402;
 pub use x402::*;
 
 declare_id!("9356RoSbLTzWE55ab6GktcTocaNhPuBEDZvsmqjkCZYw");
+
+// ========== LOCAL STATE (owned by this program) ==========
+// These structs are defined here (not imported from core) to ensure proper PDA ownership
+
+/// User lending position
+#[account]
+#[derive(InitSpace)]
+pub struct Position {
+    pub owner: Pubkey,
+    #[max_len(8)]
+    pub collaterals: Vec<CollateralDeposit>,
+    #[max_len(4)]
+    pub borrows: Vec<BorrowedAmount>,
+    pub last_update: i64,
+    pub last_gad_crank: i64,
+    pub gad_enabled: bool,
+    pub total_gad_liquidated_usd: u64,
+    pub reputation: Reputation,
+    pub bump: u8,
+}
+
+/// Single collateral deposit entry
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, InitSpace)]
+pub struct CollateralDeposit {
+    pub asset_type: AssetType,
+    pub amount: u64,
+}
+
+/// Single borrow entry
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, InitSpace)]
+pub struct BorrowedAmount {
+    pub asset_type: AssetType,
+    pub amount: u64,
+    pub accrued_interest: u64,
+}
+
+/// On-chain reputation score
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, InitSpace, Default)]
+pub struct Reputation {
+    pub successful_repayments: u32,
+    pub total_repaid_usd: u64,
+    pub gad_events: u32,
+    pub account_age_days: u32,
+}
+
+impl Reputation {
+    pub fn get_score(&self) -> u32 {
+        let base = std::cmp::min(self.successful_repayments * 50, 500);
+        let age_bonus = std::cmp::min(self.account_age_days / 30 * 10, 100);
+        base.saturating_add(age_bonus)
+            .saturating_sub(self.gad_events * 100)
+    }
+
+    /// Returns LTV bonus in basis points based on reputation
+    pub fn get_ltv_bonus_bps(&self) -> u16 {
+        match self.get_score() {
+            s if s >= 400 => 500, // +5% LTV
+            s if s >= 200 => 300, // +3% LTV
+            s if s >= 100 => 100, // +1% LTV
+            _ => 0,
+        }
+    }
+}
+
+/// Agent configuration for autonomous operations
+#[account]
+#[derive(InitSpace)]
+pub struct AgentConfig {
+    pub position: Pubkey,
+    pub operator: Pubkey,
+    pub daily_borrow_limit: u64,
+    pub daily_borrowed: u64,
+    pub period_start: i64,
+    pub auto_repay_enabled: bool,
+    pub x402_enabled: bool,
+    pub alerts_enabled: bool,
+    pub alert_threshold_bps: u16,
+    pub bump: u8,
+}
+
+impl AgentConfig {
+    /// Check if agent can borrow more today
+    pub fn can_borrow(&self, amount: u64, current_time: i64) -> bool {
+        let seconds_per_day: i64 = 86400;
+        if current_time - self.period_start >= seconds_per_day {
+            return amount <= self.daily_borrow_limit;
+        }
+        self.daily_borrowed.saturating_add(amount) <= self.daily_borrow_limit
+    }
+
+    /// Record a borrow against daily limit
+    pub fn record_borrow(&mut self, amount: u64, current_time: i64) {
+        let seconds_per_day: i64 = 86400;
+        if current_time - self.period_start >= seconds_per_day {
+            self.period_start = current_time;
+            self.daily_borrowed = amount;
+        } else {
+            self.daily_borrowed = self.daily_borrowed.saturating_add(amount);
+        }
+    }
+}
+
+/// X402 payment receipt
+#[account]
+#[derive(InitSpace)]
+pub struct X402Receipt {
+    pub payment_id: [u8; 32],
+    pub payer: Pubkey,
+    pub recipient: Pubkey,
+    pub amount: u64,
+    pub paid_at: i64,
+    pub tx_signature: [u8; 64],
+    pub bump: u8,
+}
 
 #[program]
 pub mod legasi_lending {
