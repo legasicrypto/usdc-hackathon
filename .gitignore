@@ -1,16 +1,15 @@
-# Build artifacts
-target/
-
-# IDE
-.idea/
-.vscode/
-*.swp
-
-# Node
-node_modules/
 
 # Anchor
+# Build artifacts
+# IDE
+# Node
+*.swp
 .anchor/
-sdk/node_modules
+.env
+.idea/
+.vscode/
+node_modules/
 sdk/dist
+sdk/node_modules
+target/
 test-ledger/
