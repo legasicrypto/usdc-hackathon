@@ -539,12 +539,12 @@ function Dashboard() {
 
                   {/* Agent Configuration */}
                   <div className="mt-6 p-6 bg-[#051525]/80 border border-[#0a2535] rounded-2xl backdrop-blur-sm">
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="text-lg font-semibold">🤖 Agent Configuration</h3>
+                    <div className="flex items-center justify-between mb-5">
+                      <h3 className="text-base font-semibold text-white">Agent Configuration</h3>
                       <span className={`px-3 py-1 rounded-full text-xs font-medium ${
                         agentConfig.enabled 
-                          ? "bg-[#4ade80]/20 text-[#4ade80]" 
-                          : "bg-[#6a7a88]/20 text-[#6a7a88]"
+                          ? "bg-[#4ade80]/10 text-[#4ade80] border border-[#4ade80]/20" 
+                          : "bg-[#3a4a58]/20 text-[#6a7a88] border border-[#3a4a58]/20"
                       }`}>
                         {agentConfig.enabled ? "Active" : "Disabled"}
                       </span>
@@ -585,10 +585,19 @@ function Dashboard() {
                     </div>
                     
                     {agentConfig.enabled && (
-                      <div className="mt-4 p-3 bg-[#001520]/50 rounded-lg text-xs text-[#6a7a88] space-y-1">
-                        <div>✓ Auto-repay enabled</div>
-                        <div>✓ x402 payments enabled</div>
-                        <div>✓ Daily limit: ${agentConfig.dailyLimit.toLocaleString()}</div>
+                      <div className="mt-4 p-4 bg-[#001520]/50 rounded-xl text-xs text-[#8a9aa8] space-y-2">
+                        <div className="flex items-center gap-2">
+                          <div className="w-1 h-1 rounded-full bg-[#4ade80]"></div>
+                          Auto-repay enabled
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="w-1 h-1 rounded-full bg-[#4ade80]"></div>
+                          x402 payments enabled
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="w-1 h-1 rounded-full bg-[#4ade80]"></div>
+                          Daily limit: ${agentConfig.dailyLimit.toLocaleString()}
+                        </div>
                       </div>
                     )}
                   </div>
@@ -661,12 +670,14 @@ function Dashboard() {
                   </div>
 
                   {/* GAD Protection */}
-                  <div className="p-5 bg-gradient-to-br from-[#0a2535] to-[#051525] border border-[#FF4E00]/20 rounded-2xl">
+                  <div className="p-5 bg-gradient-to-br from-[#0a2535]/80 to-[#051525]/80 border border-[#FF4E00]/10 rounded-2xl">
                     <div className="flex items-center gap-3 mb-3">
                       <div className="w-8 h-8 rounded-lg bg-[#FF4E00]/10 flex items-center justify-center">
-                        <span>🛡️</span>
+                        <svg className="w-4 h-4 text-[#FF4E00]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
+                        </svg>
                       </div>
-                      <h3 className="text-sm font-semibold">GAD Protection</h3>
+                      <h3 className="text-sm font-medium text-white">GAD Protection</h3>
                     </div>
                     <p className="text-xs text-[#6a7a88] leading-relaxed">
                       No sudden liquidations. Your position is unwound gradually over time, protecting you from MEV attacks.
@@ -836,12 +847,14 @@ function Dashboard() {
                 </div>
 
                 {/* AI Agent LP Info */}
-                <div className="p-5 bg-gradient-to-br from-[#0a2535] to-[#051525] border border-[#4ade80]/20 rounded-2xl">
+                <div className="p-5 bg-gradient-to-br from-[#0a2535]/80 to-[#051525]/80 border border-[#4ade80]/10 rounded-2xl">
                   <div className="flex items-center gap-3 mb-3">
                     <div className="w-8 h-8 rounded-lg bg-[#4ade80]/10 flex items-center justify-center">
-                      <span>🤖</span>
+                      <svg className="w-4 h-4 text-[#4ade80]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 3v1.5M4.5 8.25H3m18 0h-1.5M4.5 12H3m18 0h-1.5m-15 3.75H3m18 0h-1.5M8.25 19.5V21M12 3v1.5m0 15V21m3.75-18v1.5m0 15V21m-9-1.5h10.5a2.25 2.25 0 002.25-2.25V6.75a2.25 2.25 0 00-2.25-2.25H6.75A2.25 2.25 0 004.5 6.75v10.5a2.25 2.25 0 002.25 2.25zm.75-12h9v9h-9v-9z" />
+                      </svg>
                     </div>
-                    <h3 className="text-sm font-semibold">AI Agent Liquidity</h3>
+                    <h3 className="text-sm font-medium text-white">AI Agent Liquidity</h3>
                   </div>
                   <p className="text-xs text-[#6a7a88] leading-relaxed">
                     Your liquidity is used by AI agents for autonomous borrowing. Earn yield while powering the future of AI finance.
