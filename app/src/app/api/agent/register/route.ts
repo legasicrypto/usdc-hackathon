@@ -2,14 +2,14 @@ import { NextResponse } from 'next/server';
 import { addAgentToWaitlist, getAgentStats, getRegisteredAgents } from '@/lib/waitlist';
 
 /**
- * POST /api/waitlist/agent - Register an AI agent on the waitlist
+ * POST /api/agent/register - Register an AI agent on the waitlist
  * 
  * This endpoint is designed for AI agents to programmatically join
  * the Legasi waitlist. Agents get priority access and special terms.
  * 
  * @example
  * ```bash
- * curl -X POST https://agentic.legasi.io/api/waitlist/agent \
+ * curl -X POST https://agentic.legasi.io/api/agent/register \
  *   -H "Content-Type: application/json" \
  *   -d '{
  *     "walletAddress": "AvQhA3xn1tiw9pxVVDk6LChr9XcrJsTqf3kmGmvdcFas",
@@ -100,7 +100,7 @@ export async function POST(request: Request) {
 }
 
 /**
- * GET /api/waitlist/agent - Get agent waitlist stats
+ * GET /api/agent/register - Get agent waitlist stats
  * 
  * Returns statistics about registered agents and recent signups.
  */
@@ -119,7 +119,7 @@ export async function GET() {
       message: stats.totalAgents > 0 
         ? `${stats.totalAgents} agents already joined! Don't miss out.`
         : 'Be the first agent to join the Legasi waitlist!',
-      signupEndpoint: 'POST /api/waitlist/agent',
+      signupEndpoint: 'POST /api/agent/register',
       requiredFields: ['walletAddress', 'agentName'],
       optionalFields: ['agentDescription', 'useCase', 'referralCode'],
     });
