@@ -1,239 +1,207 @@
-# @legasi/agent-sdk
+# @legasi/sdk
 
-TypeScript SDK for AI agents to interact with Legasi Protocol — DeFi lending infrastructure purpose-built for autonomous agents.
-
-## Features
-
-- 🤖 **Agent-First Design** — High-level methods for common agent operations
-- 💸 **x402 Payments** — Native support for x402 payment protocol
-- 🔐 **Daily Limits** — Built-in guardrails for autonomous spending
-- 📊 **Health Monitoring** — Real-time position health and risk assessment
-- 🏦 **Auto-Borrow** — Automatically borrow when making payments if needed
-- ⚡ **Auto-Repay** — Configurable auto-repayment of debts
+TypeScript SDK for AI agents to interact with Legasi Protocol on Solana.
 
 ## Installation
 
 ```bash
-npm install @legasi/agent-sdk
+npm install @legasi/sdk
 # or
-yarn add @legasi/agent-sdk
-# or
-pnpm add @legasi/agent-sdk
+yarn add @legasi/sdk
 ```
 
 ## Quick Start
 
 ```typescript
-import { LegasiAgentSDK } from '@legasi/agent-sdk';
-import { Keypair } from '@solana/web3.js';
-import { BN } from '@coral-xyz/anchor';
+import { Connection } from '@solana/web3.js';
+import { AgentClient } from '@legasi/sdk';
 
-// Create SDK from keypair
-const keypair = Keypair.generate();
-const sdk = LegasiAgentSDK.fromKeypair(keypair, { 
-  network: 'devnet',
-  debug: true 
+// Initialize
+const connection = new Connection('https://api.devnet.solana.com');
+const agent = new AgentClient(connection, wallet, {
+  dailyBorrowLimitUsd: 1000,
+  autoRepayEnabled: true,
+  x402Enabled: true,
 });
 
-// Initialize position
-await sdk.initializePosition();
+// Configure agent on-chain
+await agent.configureAgent();
 
-// Deposit SOL as collateral
-await sdk.depositSol(2.0); // 2 SOL
+// Deposit collateral
+await agent.depositSol(1.5);
 
-// Borrow USDC
-await sdk.borrow(100); // 100 USDC
+// Autonomous borrow (within limits)
+await agent.autonomousBorrow(100, USDC_MINT);
 
-// Check health
-const health = await sdk.checkHealth();
-console.log(`LTV: ${health.currentLtvBps / 100}%`);
-console.log(`Risk: ${health.riskLevel}`);
+// Monitor health
+agent.onAlert((alert) => {
+  console.log(`Alert: ${alert.message}`);
+});
+agent.startMonitoring();
 ```
 
-## Agent Configuration
+## Clients
 
-Configure autonomous behavior with daily limits and auto-features:
+### AgentClient
+
+The recommended client for AI agents. Features:
+- Autonomous borrowing within daily limits
+- Auto-repayment when LTV exceeds threshold
+- x402 payment authorization
+- Health monitoring with alerts
 
 ```typescript
-import { BN } from '@coral-xyz/anchor';
-
-await sdk.configureAgent({
-  dailyBorrowLimit: new BN(1000_000_000), // 1000 USDC max/day
-  autoRepayEnabled: true,  // Auto-repay when receiving USDC
-  x402Enabled: true,       // Enable x402 payments
-  alertThresholdBps: 7500, // Alert at 75% LTV
+const agent = new AgentClient(connection, wallet, {
+  dailyBorrowLimitUsd: 1000,
+  autoRepayEnabled: true,
+  autoRepayThresholdBps: 8000, // 80%
+  x402Enabled: true,
+  x402DailyLimitUsd: 100,
+  alertThresholdBps: 7500, // 75%
 });
 ```
 
-## x402 Payments
+### LegasiClient
 
-Process x402 payment requests (auto-borrows if needed):
+Base client for manual operations:
 
 ```typescript
-import { randomBytes } from 'crypto';
+const client = new LegasiClient(connection, wallet);
 
-const result = await sdk.x402Pay({
-  paymentId: randomBytes(32),
-  recipient: serviceProviderPublicKey,
-  amount: new BN(5_000_000), // 5 USDC
-  expiresAt: new BN(Date.now() / 1000 + 3600), // 1 hour
-  description: 'API call to GPT-4',
-}, true); // autoBorrow = true
-
-console.log(`Payment TX: ${result.signature}`);
-console.log(`Borrowed: ${result.borrowed}`);
+await client.initializePosition();
+await client.depositSol(1);
+await client.borrow({ amount: 50, mint: USDC_MINT });
+await client.repay({ amount: 50, mint: USDC_MINT });
+await client.withdrawSol(1);
 ```
 
-## Health Monitoring
+### GadClient
 
-Monitor position health for risk management:
+Gradual Auto-Deleveraging protection:
 
 ```typescript
-const health = await sdk.checkHealth();
+const gad = new GadClient(connection, wallet);
 
-console.log(`Collateral: $${health.collateralValueUsd.toNumber() / 1e6}`);
-console.log(`Borrowed: $${health.borrowedValueUsd.toNumber() / 1e6}`);
-console.log(`LTV: ${health.currentLtvBps / 100}%`);
-console.log(`Max LTV: ${health.maxLtvBps / 100}%`);
-console.log(`Buffer: ${health.bufferBps / 100}%`);
-console.log(`Available to borrow: $${health.availableToBorrow.toNumber() / 1e6}`);
-console.log(`Risk level: ${health.riskLevel}`);
-console.log(`Reputation bonus: ${health.reputationBonusBps / 100}%`);
+await gad.configure({
+  enabled: true,
+  startThresholdBps: 8000,
+  stepSizeBps: 500,
+  minIntervalSeconds: 3600,
+});
 
-// Check if at risk
-if (await sdk.isAtRisk('high')) {
-  console.log('⚠️ Position at high risk!');
-  // Trigger repayment or alert
-}
+const status = await gad.getStatus();
 ```
 
-## API Reference
+### FlashLoanClient
 
-### Constructor
+Flash loans for arbitrage and liquidations:
 
 ```typescript
-new LegasiAgentSDK(wallet: Wallet, config?: LegasiSDKConfig)
+const flash = new FlashLoanClient(connection, wallet);
+
+await flash.execute({
+  amount: 10000,
+  mint: USDC_MINT,
+  innerInstructions: [
+    // Your arbitrage instructions
+  ],
+});
 ```
 
-**Config Options:**
-- `network`: `'mainnet' | 'devnet' | 'localnet'` (default: `'devnet'`)
-- `endpoint`: Custom RPC endpoint
-- `usdcMint`: Custom USDC mint address
-- `debug`: Enable debug logging (default: `false`)
+### LeverageClient
 
-### Static Constructors
+One-click leveraged positions:
 
 ```typescript
-// From Keypair
-LegasiAgentSDK.fromKeypair(keypair: Keypair, config?: LegasiSDKConfig)
+const leverage = new LeverageClient(connection, wallet);
 
-// From secret key
-LegasiAgentSDK.fromSecretKey(secretKey: Uint8Array | string, config?: LegasiSDKConfig)
+// 3x long SOL
+await leverage.openLong({
+  collateralAmount: 1,
+  leverage: 3,
+  direction: 'long',
+});
+
+// Close position
+await leverage.close();
 ```
 
-### Core Operations
-
-| Method | Description |
-|--------|-------------|
-| `initializePosition()` | Create a new lending position |
-| `depositSol(amount)` | Deposit SOL as collateral |
-| `borrow(amount)` | Borrow USDC against collateral |
-| `repay(amount)` | Repay borrowed USDC |
-| `withdrawSol(amount)` | Withdraw SOL collateral |
-
-### Agent Operations
-
-| Method | Description |
-|--------|-------------|
-| `configureAgent(config)` | Set up agent limits and features |
-| `agentBorrow(amount)` | Borrow with daily limit checks |
-| `x402Pay(request, autoBorrow)` | Process x402 payment |
-| `verifyX402Payment(paymentId)` | Verify payment receipt exists |
-
-### Health & Monitoring
-
-| Method | Description |
-|--------|-------------|
-| `checkHealth()` | Get full health metrics |
-| `isAtRisk(threshold)` | Check if position is at risk |
-| `getDailyBorrowRemaining()` | Get remaining daily limit |
-| `getUsdcBalance()` | Get wallet USDC balance |
-| `getSolBalance()` | Get wallet SOL balance |
-
-### Account Fetching
-
-| Method | Description |
-|--------|-------------|
-| `getPosition(owner?)` | Fetch position account |
-| `getAgentConfig(position?)` | Fetch agent config |
-| `getSolPrice()` | Get current SOL price |
-
-## Example: Autonomous Agent Loop
+## Utils
 
 ```typescript
-import { LegasiAgentSDK } from '@legasi/agent-sdk';
-import { BN } from '@coral-xyz/anchor';
+import {
+  calculateLTV,
+  calculateHealthFactor,
+  calculateLiquidationPrice,
+  formatUSD,
+  formatSOL,
+} from '@legasi/sdk';
 
-async function agentLoop(sdk: LegasiAgentSDK) {
-  while (true) {
-    // Check health
-    const health = await sdk.checkHealth();
-    
-    // Auto-repay if at risk
-    if (health.riskLevel === 'critical') {
-      const balance = await sdk.getUsdcBalance();
-      if (balance.gt(new BN(0))) {
-        await sdk.repay(balance.toNumber() / 1e6);
-        console.log('Auto-repaid to reduce risk');
-      }
+const ltv = calculateLTV(collateralValueUsd, debtValueUsd);
+const healthFactor = calculateHealthFactor(collateralValueUsd, debtValueUsd);
+const liqPrice = calculateLiquidationPrice(collateralAmount, debtValueUsd);
+```
+
+## Constants
+
+```typescript
+import { PROGRAM_IDS, MINTS, DEFAULTS } from '@legasi/sdk';
+
+console.log(PROGRAM_IDS.CORE); // Core program address
+console.log(MINTS.USDC); // USDC mint (devnet)
+console.log(DEFAULTS.SOL_MAX_LTV_BPS); // 7500 (75%)
+```
+
+## Types
+
+```typescript
+import type {
+  Position,
+  HealthStatus,
+  AgentConfigData,
+  GadConfigData,
+  TxResult,
+} from '@legasi/sdk';
+```
+
+## Example: Autonomous Trading Agent
+
+```typescript
+import { Connection, Keypair } from '@solana/web3.js';
+import { AgentClient, MINTS } from '@legasi/sdk';
+
+async function runAgent() {
+  const connection = new Connection('https://api.devnet.solana.com');
+  const keypair = Keypair.fromSecretKey(/* your key */);
+  
+  const agent = new AgentClient(connection, { publicKey: keypair.publicKey, signTransaction: ... }, {
+    dailyBorrowLimitUsd: 500,
+    autoRepayEnabled: true,
+    x402Enabled: true,
+  });
+
+  // Set up monitoring
+  agent.onAlert(async (alert) => {
+    if (alert.type === 'ltv_warning') {
+      console.log('⚠️ LTV Warning:', alert.message);
     }
-    
-    // Process pending tasks...
-    // Make x402 payments as needed...
-    
-    await sleep(60000); // Check every minute
+    if (alert.type === 'auto_repay') {
+      console.log('🔄 Auto-repaying:', alert.message);
+    }
+  });
+
+  agent.startMonitoring(30000); // Check every 30 seconds
+
+  // Trading logic
+  const health = await agent.getHealthStatus();
+  
+  if (health.availableToBorrow > 100) {
+    // Borrow and do something productive
+    await agent.autonomousBorrow(100, MINTS.USDC);
   }
 }
 ```
-
-## Error Handling
-
-```typescript
-try {
-  await sdk.borrow(1000);
-} catch (error) {
-  if (error.message.includes('ExceedsLTV')) {
-    console.log('Insufficient collateral for this borrow');
-  } else if (error.message.includes('InsufficientLiquidity')) {
-    console.log('Not enough liquidity in the pool');
-  } else {
-    throw error;
-  }
-}
-```
-
-## Networks
-
-| Network | RPC Endpoint | USDC Mint |
-|---------|-------------|-----------|
-| Mainnet | `https://api.mainnet-beta.solana.com` | `EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v` |
-| Devnet | `https://api.devnet.solana.com` | `4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU` |
-| Localnet | `http://localhost:8899` | Test mint |
-
-## Security Notes
-
-- 🔐 Never commit private keys to version control
-- 🛡️ Set reasonable daily borrow limits for autonomous agents
-- 📊 Monitor health regularly to avoid liquidation
-- 🔄 Test thoroughly on devnet before mainnet deployment
 
 ## License
 
 MIT
-
-## Links
-
-- [Legasi Protocol](https://legasi.fi)
-- [Documentation](https://docs.legasi.fi)
-- [GitHub](https://github.com/legasi-fi)
-- [Discord](https://discord.gg/legasi)

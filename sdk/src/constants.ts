@@ -1,143 +1,115 @@
 import { PublicKey } from '@solana/web3.js';
 
-// ============================================================================
-// PROGRAM IDS
-// ============================================================================
+/**
+ * Legasi Program IDs
+ */
+export const PROGRAM_IDS = {
+  /** Core protocol state and configuration */
+  CORE: new PublicKey('4FW9iFaerNuX1GstRKSsWo9UfnTbjtqch3fEHkWMF1Uy'),
+  /** Lending operations (deposit, borrow, repay) */
+  LENDING: new PublicKey('11111111111111111111111111111111'), // TODO: deploy
+  /** LP pools */
+  LP: new PublicKey('CTwY4VSeueesSBc95G38X3WJYPriJEzyxjcCaZAc5LbY'),
+  /** Gradual Auto-Deleveraging */
+  GAD: new PublicKey('89E84ALdDdGGNuJAxho2H45aC25kqNdGg7QtwTJ3pngK'),
+  /** Flash loans */
+  FLASH: new PublicKey('Fj8CJNK1gBAuNR7dFbKLDckSstKmZn8ihTGwFXxfY93m'),
+  /** One-click leverage */
+  LEVERAGE: new PublicKey('11111111111111111111111111111111'), // TODO: deploy
+} as const;
 
-/** Legasi Core program - protocol state, collateral config, price feeds */
-export const LEGASI_CORE_PROGRAM_ID = new PublicKey(
-  '5Mru5amfomEPqNiEULRuHpgAZyyENqyCeNnkSoh7QjLy'
-);
+/**
+ * Well-known token mints
+ */
+export const MINTS = {
+  /** Wrapped SOL */
+  WSOL: new PublicKey('So11111111111111111111111111111111111111112'),
+  /** USDC (devnet) */
+  USDC: new PublicKey('4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU'),
+  /** USDT (devnet) */
+  USDT: new PublicKey('EJwZgeZrdC8TXTQbQBoL6bfuAnFUUy1PVCMB4DYPzVaS'),
+} as const;
 
-/** Legasi Lending program - positions, borrows, agent functions */
-export const LEGASI_LENDING_PROGRAM_ID = new PublicKey(
-  'DGRYqD9Hg9v27Fa9kLUUf3KY9hoprjBQp7y88qG9q88u'
-);
-
-/** Legasi LP program - liquidity pools, bUSDC token */
-export const LEGASI_LP_PROGRAM_ID = new PublicKey(
-  '4g7FgDLuxXJ7fRa57m8SV3gjznMZ9KUjcdJfg1b6BfPF'
-);
-
-/** Legasi GAD program - Gradual Adjustment Damage mechanism */
-export const LEGASI_GAD_PROGRAM_ID = new PublicKey(
-  'Ed7pfvjR1mRWmzHP3r1NvukESGr38xZKwpoQ5jGSAVad'
-);
-
-/** Legasi Flash program - flash loans */
-export const LEGASI_FLASH_PROGRAM_ID = new PublicKey(
-  '24zjRceYHjkyP8Nr4bc4q9T7TBbkf292gFocGp6SM5Fz'
-);
-
-/** Legasi Leverage program - leverage operations */
-export const LEGASI_LEVERAGE_PROGRAM_ID = new PublicKey(
-  'G9iVPMnf4kiRKr59tn1t7m5W4WK2KveFLzANX4bbHtjA'
-);
-
-// ============================================================================
-// TOKEN MINTS
-// ============================================================================
-
-/** Wrapped SOL mint address */
-export const WRAPPED_SOL_MINT = new PublicKey(
-  'So11111111111111111111111111111111111111112'
-);
-
-/** USDC mint on mainnet */
-export const USDC_MINT_MAINNET = new PublicKey(
-  'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'
-);
-
-/** USDC mint on devnet */
-export const USDC_MINT_DEVNET = new PublicKey(
-  '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU'
-);
-
-/** cbBTC (Coinbase wrapped BTC) mint */
-export const CBBTC_MINT = new PublicKey(
-  'cbbtcf6aa7gyqmcpqpqtaxpqj7typzfxstz1y12j14a'  // Update with actual
-);
-
-/** JitoSOL mint */
-export const JITOSOL_MINT = new PublicKey(
-  'J1toso1uCk3RLmjorhTtrVwY9HJ7X8V9yYac6Y7kGCPn'
-);
-
-// ============================================================================
-// PROTOCOL CONSTANTS
-// ============================================================================
-
-/** Basis points denominator (100% = 10000) */
-export const BPS_DENOMINATOR = 10000;
-
-/** Lamports per SOL */
-export const LAMPORTS_PER_SOL = 1_000_000_000;
-
-/** USDC decimals */
-export const USDC_DECIMALS = 6;
-
-/** Default max LTV for SOL (75%) */
-export const DEFAULT_SOL_MAX_LTV_BPS = 7500;
-
-/** Default liquidation threshold (80%) */
-export const DEFAULT_LIQUIDATION_THRESHOLD_BPS = 8000;
-
-/** Default liquidation bonus (5%) */
-export const DEFAULT_LIQUIDATION_BONUS_BPS = 500;
-
-/** Flash loan fee (0.05%) */
-export const FLASH_LOAN_FEE_BPS = 5;
-
-/** Insurance fund allocation (5% of interest) */
-export const INSURANCE_FUND_BPS = 500;
-
-/** Max collateral types per position */
-export const MAX_COLLATERAL_TYPES = 8;
-
-/** Max borrow types per position */
-export const MAX_BORROW_TYPES = 4;
-
-/** Price feed max age in seconds (5 minutes) */
-export const MAX_PRICE_AGE = 300;
-
-// ============================================================================
-// PDA SEEDS
-// ============================================================================
-
+/**
+ * PDA Seeds
+ */
 export const SEEDS = {
-  PROTOCOL: Buffer.from('protocol'),
-  POSITION: Buffer.from('position'),
-  COLLATERAL: Buffer.from('collateral'),
-  BORROWABLE: Buffer.from('borrowable'),
-  PRICE: Buffer.from('price'),
-  SOL_VAULT: Buffer.from('sol_vault'),
-  TOKEN_VAULT: Buffer.from('token_vault'),
-  BORROW_VAULT: Buffer.from('borrow_vault'),
-  LP_POOL: Buffer.from('lp_pool'),
-  LP_TOKEN: Buffer.from('lp_token'),
-  LP_VAULT: Buffer.from('lp_vault'),
-  AGENT_CONFIG: Buffer.from('agent_config'),
-  X402_RECEIPT: Buffer.from('x402_receipt'),
-  OFFRAMP: Buffer.from('offramp'),
+  PROTOCOL: 'protocol',
+  POSITION: 'position',
+  COLLATERAL: 'collateral',
+  PRICE: 'price',
+  AGENT_CONFIG: 'agent_config',
+  GAD_CONFIG: 'gad_config',
+  LP_POOL: 'lp_pool',
+  LP_TOKEN: 'lp_token',
+  LP_VAULT: 'lp_vault',
+  FLASH: 'flash',
+  SOL_VAULT: 'sol_vault',
 } as const;
 
-// ============================================================================
-// NETWORK CONFIGS
-// ============================================================================
+/**
+ * Default values
+ */
+export const DEFAULTS = {
+  /** Default max LTV for SOL collateral (75%) */
+  SOL_MAX_LTV_BPS: 7500,
+  /** Default liquidation threshold (85%) */
+  LIQUIDATION_THRESHOLD_BPS: 8500,
+  /** Default liquidation penalty (5%) */
+  LIQUIDATION_PENALTY_BPS: 500,
+  /** Flash loan fee (0.09%) */
+  FLASH_FEE_BPS: 9,
+  /** GAD start threshold (80% LTV) */
+  GAD_START_THRESHOLD_BPS: 8000,
+  /** GAD step size (5% per step) */
+  GAD_STEP_SIZE_BPS: 500,
+  /** GAD minimum interval (1 hour) */
+  GAD_MIN_INTERVAL_SECONDS: 3600,
+  /** Default slippage for swaps (1%) */
+  SLIPPAGE_BPS: 100,
+} as const;
 
-export const NETWORK_CONFIGS = {
-  mainnet: {
-    endpoint: 'https://api.mainnet-beta.solana.com',
-    usdcMint: USDC_MINT_MAINNET,
+/**
+ * Reputation thresholds
+ */
+export const REPUTATION = {
+  /** Points per successful repayment */
+  POINTS_PER_REPAYMENT: 50,
+  /** Maximum points from repayments */
+  MAX_REPAYMENT_POINTS: 500,
+  /** Points deducted per GAD event */
+  GAD_PENALTY: 100,
+  /** LTV bonus threshold (score >= 400) */
+  BONUS_THRESHOLD_HIGH: 400,
+  /** LTV bonus for high reputation (5%) */
+  BONUS_HIGH_BPS: 500,
+  /** LTV bonus threshold (score >= 200) */
+  BONUS_THRESHOLD_MED: 200,
+  /** LTV bonus for medium reputation (3%) */
+  BONUS_MED_BPS: 300,
+} as const;
+
+/**
+ * Network configurations
+ */
+export const NETWORKS = {
+  DEVNET: {
+    rpcUrl: 'https://api.devnet.solana.com',
+    wsUrl: 'wss://api.devnet.solana.com',
   },
-  devnet: {
-    endpoint: 'https://api.devnet.solana.com',
-    usdcMint: USDC_MINT_DEVNET,
-  },
-  localnet: {
-    endpoint: 'http://localhost:8899',
-    usdcMint: USDC_MINT_DEVNET, // Use devnet mint for local testing
+  MAINNET: {
+    rpcUrl: 'https://api.mainnet-beta.solana.com',
+    wsUrl: 'wss://api.mainnet-beta.solana.com',
   },
 } as const;
 
-export type NetworkName = keyof typeof NETWORK_CONFIGS;
+/**
+ * Decimals for common tokens
+ */
+export const DECIMALS = {
+  SOL: 9,
+  USDC: 6,
+  USDT: 6,
+  /** Price feeds use 6 decimals */
+  USD: 6,
+} as const;
