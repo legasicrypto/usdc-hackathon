@@ -18,3 +18,4 @@ test-ledger/
 .env*.local
 video/out/
 tweet.js
+.cbbtc-token.json
