@@ -6,14 +6,14 @@
 //! ## Key Features
 //!
 //! - **Multiple Markets**: Each market has unique risk parameters (LTV, liquidation thresholds, interest rates)
-//! - **eMode (Efficiency Mode)**: Correlated assets get higher LTV (e.g., SOL/JitoSOL up to 93%)
+//! - **eMode (Efficiency Mode)**: Correlated assets get higher LTV (e.g., BTC/cbBTC up to 93%)
 //! - **Dynamic Interest Rates**: Utilization-based interest model with configurable slopes
 //! - **Supply/Borrow Caps**: Protocol-level risk management
 //!
 //! ## eMode Categories
 //!
 //! - `Stablecoins`: USDC, USDT, EURC (up to 97% LTV)
-//! - `SolCorrelated`: SOL, JitoSOL, mSOL (up to 93% LTV)
+//! - `SolCorrelated`: SOL (up to 75% LTV)
 //! - `BtcCorrelated`: wBTC, cbBTC (up to 93% LTV)
 //! - `EthCorrelated`: ETH, stETH, wstETH (up to 93% LTV)
 //!
@@ -45,7 +45,7 @@ pub enum EModeCategory {
     Stablecoins = 1,
     /// ETH ecosystem (ETH, stETH, wstETH, cbETH)
     EthCorrelated = 2,
-    /// SOL ecosystem (SOL, JitoSOL, mSOL)
+    /// SOL ecosystem (SOL)
     SolCorrelated = 3,
     /// BTC ecosystem (BTC, wBTC, cbBTC)
     BtcCorrelated = 4,
@@ -233,46 +233,6 @@ impl MarketPreset {
             supply_cap: 0,
             borrow_cap: 0,
             min_borrow: 1_000_000, // $1 USDC
-        }
-    }
-    
-    /// JitoSOL/USDC - LST market
-    pub fn jitosol_usdc() -> MarketParams {
-        MarketParams {
-            name: "JitoSOL/USDC".to_string(),
-            base_max_ltv_bps: 7500,
-            emode_max_ltv_bps: 7500,
-            gad_soft_threshold_bps: 500,
-            gad_hard_threshold_bps: 1500,
-            liquidation_bonus_bps: 500,
-            base_interest_rate_bps: 200,
-            slope1_bps: 400,
-            slope2_bps: 7500,
-            optimal_utilization_bps: 8000,
-            emode_category: EModeCategory::SolCorrelated,
-            supply_cap: 0,
-            borrow_cap: 0,
-            min_borrow: 1_000_000,
-        }
-    }
-    
-    /// SOL/JitoSOL - eMode market (correlated assets)
-    pub fn sol_jitosol_emode() -> MarketParams {
-        MarketParams {
-            name: "SOL/JitoSOL eMode".to_string(),
-            base_max_ltv_bps: 8000,       // 80% base
-            emode_max_ltv_bps: 9300,      // 93% with eMode!
-            gad_soft_threshold_bps: 300,  // Tighter threshold
-            gad_hard_threshold_bps: 700,
-            liquidation_bonus_bps: 200,   // Lower bonus (correlated)
-            base_interest_rate_bps: 100,  // Lower rates
-            slope1_bps: 200,
-            slope2_bps: 5000,
-            optimal_utilization_bps: 9000, // Higher optimal
-            emode_category: EModeCategory::SolCorrelated,
-            supply_cap: 0,
-            borrow_cap: 0,
-            min_borrow: 100_000_000, // 0.1 JitoSOL
         }
     }
     

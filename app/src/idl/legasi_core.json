@@ -255,7 +255,7 @@
     {
       "name": "register_collateral",
       "docs": [
-        "Register a collateral asset (SOL, cbBTC, JitoSOL, etc.)"
+        "Register a collateral asset (SOL, cbBTC)"
       ],
       "discriminator": [
         141,

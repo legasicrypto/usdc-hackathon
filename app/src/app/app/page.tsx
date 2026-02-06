@@ -9,7 +9,7 @@ import OffRampModal from '@/components/offramp/OffRampModal';
 const mockPosition = {
   collateral: {
     SOL: { amount: 0, valueUsd: 0 },
-    JitoSOL: { amount: 0, valueUsd: 0 },
+    cbBTC: { amount: 0, valueUsd: 0 },
   },
   borrowed: {
     USDC: { amount: 0, accrued: 0 },
@@ -145,7 +145,7 @@ export default function AppPage() {
                 <h3 className="text-sm text-[#6a7a88] mb-3">Collateral</h3>
                 <div className="space-y-2">
                   <PositionRow asset="SOL" amount="0" value="$0.00" />
-                  <PositionRow asset="JitoSOL" amount="0" value="$0.00" />
+                  <PositionRow asset="cbBTC" amount="0" value="$0.00" />
                 </div>
               </div>
 
@@ -235,7 +235,6 @@ function DepositPanel() {
           className="w-full px-4 py-3 bg-[#001520] rounded-xl border border-[#0a2535] focus:border-[#FF4E00] focus:outline-none transition-all"
         >
           <option value="SOL">SOL</option>
-          <option value="JitoSOL">JitoSOL</option>
           <option value="cbBTC">cbBTC</option>
         </select>
       </div>

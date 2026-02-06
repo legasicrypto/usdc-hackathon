@@ -35,7 +35,7 @@ pub mod legasi_core {
         Ok(())
     }
 
-    /// Register a collateral asset (SOL, cbBTC, JitoSOL, etc.)
+    /// Register a collateral asset (SOL, cbBTC)
     pub fn register_collateral(
         ctx: Context<RegisterCollateral>,
         oracle: Pubkey,

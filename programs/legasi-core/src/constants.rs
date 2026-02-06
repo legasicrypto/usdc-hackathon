@@ -60,9 +60,3 @@ pub const USDC_MINT_DEVNET: &str = "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU
 
 /// cbBTC (Coinbase wrapped BTC) - mainnet
 pub const CBBTC_MINT_MAINNET: &str = "cbBTC111111111111111111111111111111111111111"; // Placeholder
-
-/// JitoSOL
-pub const JITOSOL_MINT: &str = "J1toso1uCk3RLmjorhTtrVwY9HJ7X8V9yYac6Y7kGCPn";
-
-/// mSOL (Marinade)
-pub const MSOL_MINT: &str = "mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So";
