@@ -17,3 +17,4 @@ test-ledger/
 .vercel
 .env*.local
 video/out/
+tweet.js

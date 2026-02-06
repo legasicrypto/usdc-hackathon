@@ -223,11 +223,11 @@ pub struct FlashBorrow<'info> {
         bump
     )]
     pub flash_state: Account<'info, FlashLoanState>,
-    /// CHECK: LP Pool (owned by LP program - validated manually)
+    /// LP Pool (owned by LP program)
     #[account(mut)]
-    pub lp_pool: UncheckedAccount<'info>,
-    /// CHECK: Borrowable config (owned by core program - validated manually)
-    pub borrowable: UncheckedAccount<'info>,
+    pub lp_pool: Account<'info, LpPool>,
+    /// Borrowable config (owned by core program)
+    pub borrowable: Account<'info, Borrowable>,
     /// LP Vault
     #[account(mut)]
     pub vault: Account<'info, TokenAccount>,
@@ -248,11 +248,12 @@ pub struct FlashRepay<'info> {
         has_one = borrower
     )]
     pub flash_state: Account<'info, FlashLoanState>,
-    /// CHECK: LP Pool (owned by LP program - validated manually)
+    /// LP Pool (owned by LP program)
     #[account(mut)]
-    pub lp_pool: UncheckedAccount<'info>,
-    /// CHECK: Protocol (owned by core program - validated manually)
-    pub protocol: UncheckedAccount<'info>,
+    pub lp_pool: Account<'info, LpPool>,
+    /// Protocol (owned by core program)
+    #[account(mut)]
+    pub protocol: Account<'info, Protocol>,
     /// LP Vault
     #[account(mut)]
     pub vault: Account<'info, TokenAccount>,
