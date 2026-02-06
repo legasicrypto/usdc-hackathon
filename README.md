@@ -316,7 +316,7 @@ anchor deploy --provider.cluster devnet
 
 ## 🤝 Team
 
-Built for the **Colosseum Hackathon** by the Legasi team.
+Built by the Legasi team for the USDC Hackathon.
 
 ---
 
