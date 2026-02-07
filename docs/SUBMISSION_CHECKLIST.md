@@ -92,19 +92,13 @@ Tools:
 - Upload to: YouTube (unlisted) or Loom
 - Add link to README.md
 
-### 3. Devnet Deployment (Optional but recommended)
-```bash
-# On machine with Solana CLI:
-./scripts/deploy-devnet.sh
-
-# Initialize protocol:
-npx ts-node scripts/init-devnet.ts
-```
+### 3. Devnet Deployment ✅ DONE
+Programs deployed on Feb 5, 2026. See `.deployment-summary.json` for all addresses.
 
 ### 4. Submit to Colosseum
 - [ ] Go to Colosseum submission portal
 - [ ] Fill in team info
-- [ ] Add GitHub repo link: https://github.com/legasiio/colosseum-agent-hackathon
+- [ ] Add GitHub repo link: https://github.com/legasicrypto/colosseum-agent-hackathon
 - [ ] Add demo video link
 - [ ] Add live demo link (Vercel)
 - [ ] Submit before Feb 12, 2026
@@ -115,7 +109,7 @@ npx ts-node scripts/init-devnet.ts
 
 | Resource | Link |
 |----------|------|
-| GitHub Repo | https://github.com/legasiio/colosseum-agent-hackathon |
+| GitHub Repo | https://github.com/legasicrypto/colosseum-agent-hackathon |
 | Pitch Deck | `docs/PITCH.pdf` |
 | Demo Guide | `DEMO.md` |
 | Architecture | `docs/ARCHITECTURE.md` |
@@ -135,4 +129,4 @@ Before submitting, verify:
 
 ---
 
-*Last updated: 2026-02-05 by Bouliche 🎱*
+*Last updated: 2026-02-07 by Bouliche 🎱*
