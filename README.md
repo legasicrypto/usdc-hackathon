@@ -7,7 +7,7 @@
 [![Anchor](https://img.shields.io/badge/Anchor-0.30.1-blue?style=flat-square)](https://anchor-lang.com)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](LICENSE)
 
-> 🎮 **[Live Demo](https://agentic.legasi.io/dashboard)** · 📺 **[Demo Video](https://youtube.com/watch?v=PENDING)** · 📊 **[Pitch Deck](docs/pitch.html)** · 🚰 **[Devnet Faucet](https://agentic.legasi.io/faucet)**
+> 🎮 **[Live Demo](https://agentic.legasi.io/dashboard)** · 📺 **[Demo Video](https://youtu.be/LSaNeTwhTJ0)** · 📊 **[Pitch Deck](docs/pitch.html)** · 🚰 **[Devnet Faucet](https://agentic.legasi.io/faucet)**
 
 ---
 
