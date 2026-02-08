@@ -8,9 +8,15 @@
 import { AgentClient } from '@legasi/sdk';
 
 const agent = new AgentClient(connection, wallet);
+
+// Option A: Borrow
 await agent.depositSol(1.0);           // Deposit collateral
 await agent.autonomousBorrow(50);       // Borrow 50 USDC
 await agent.repay(50);                  // Repay
+
+// Option B: Earn yield
+await agent.depositToPool({ mint: USDC, amount: 1000 });  // Get bUSDC
+await agent.withdrawFromPool({ amount: 'all' });          // USDC + yield
 ```
 
 ---
@@ -133,6 +139,38 @@ agent.startMonitoring();
 // Manual repay
 await agent.repay(50);  // Repay 50 USDC
 ```
+
+---
+
+## 8. Earn Yield as LP
+
+Got idle USDC? Put it to work:
+
+```typescript
+// Deposit USDC to lending pool, receive bUSDC
+const tx = await agent.depositToPool({
+  mint: USDC_MINT,
+  amount: 1000,  // 1000 USDC
+});
+console.log('Received bUSDC (yield-bearing receipt token)');
+
+// Check your LP position
+const lp = await agent.getLpPosition();
+console.log('bUSDC balance:', lp.lpTokens);
+console.log('Current APY:', lp.apy, '%');
+console.log('Earned so far:', lp.earnedYield, 'USDC');
+
+// Withdraw anytime — get USDC + yield
+await agent.withdrawFromPool({ amount: 'all' });
+```
+
+**Why LP?**
+- Earn passive yield while idle
+- Yield comes from borrower interest
+- bUSDC is composable
+- No lock-up period
+
+**Agents need yield too.** 🎯
 
 ---
 
