@@ -204,20 +204,27 @@ console.log('Reputation score:', position.reputation.getScore());
 console.log('LTV bonus:', position.reputation.getLtvBonusBps(), 'bps');
 ```
 
-### For Liquidity Providers
+### For Agent LPs (Earn Yield)
+
+Agents with idle USDC can earn yield by providing liquidity:
 
 ```typescript
-// Deposit to earn yield from agent borrowing
-await client.deposit({
+// Deposit USDC, receive bUSDC (yield-bearing receipt token)
+await client.depositToPool({
   mint: USDC_MINT,
   amount: 50_000,
 });
 
-// Check pool stats
+// Check pool stats and your earnings
 const pool = await client.getPool(USDC_MINT);
-console.log('Utilization:', pool.utilization, '%');
-console.log('APY:', pool.supplyApy, '%');
+console.log('Pool APY:', pool.supplyApy, '%');
+console.log('Your bUSDC:', await client.getLpBalance());
+
+// Withdraw anytime — receive USDC + yield
+await client.withdrawFromPool({ amount: 'all' });
 ```
+
+**Agents need yield too.** Don't let your USDC sit idle.
 
 ---
 
