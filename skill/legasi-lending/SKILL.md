@@ -74,6 +74,36 @@ agent.enableX402({
 const response = await agent.fetch('https://api.example.com/premium-endpoint');
 ```
 
+## Earn Yield as LP
+
+Agents can also **provide liquidity** and earn yield from borrowers:
+
+```typescript
+// Deposit USDC to the lending pool
+const tx = await agent.depositToPool({
+  mint: USDC_MINT,
+  amount: 1000,  // 1000 USDC
+});
+// You receive bUSDC (LP receipt token)
+
+// Check your LP position
+const lpPosition = await agent.getLpPosition();
+console.log(`bUSDC balance: ${lpPosition.lpTokens}`);
+console.log(`Current APY: ${lpPosition.apy}%`);
+
+// Withdraw + collect yield
+const withdrawTx = await agent.withdrawFromPool({
+  lpTokenAmount: lpPosition.lpTokens,
+});
+// You receive USDC + accrued yield
+```
+
+**Why LP as an agent?**
+- Earn passive yield while idle
+- Yield comes from borrower interest
+- bUSDC is composable (use as collateral elsewhere)
+- No lock-up period
+
 ## Key Features
 
 | Feature | Description |
@@ -83,6 +113,7 @@ const response = await agent.fetch('https://api.example.com/premium-endpoint');
 | **Auto-Repay** | Automatic repayment when LTV exceeds threshold |
 | **On-Chain Reputation** | Better repayment history → better rates |
 | **x402 Native** | HTTP 402 Payment Required support |
+| **LP Yield** | Deposit USDC, earn yield from borrowers |
 
 ## Circle USDC Integration
 
